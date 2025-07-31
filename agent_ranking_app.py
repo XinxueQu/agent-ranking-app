@@ -1,7 +1,9 @@
-import pandas as pd
-import glob
-import os
+import pandas as pd 
 import numpy as np 
+import streamlit as st
+
+st.set_page_config(page_title="Agent Rankings", layout="wide")
+st.title("Top Real Estate Agent Rankings")
 
 def pricing_accuracy_score(ratio):
     if pd.isna(ratio):
