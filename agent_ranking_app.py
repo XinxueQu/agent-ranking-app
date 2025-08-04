@@ -45,7 +45,7 @@ agent_summary['median_days_on_mkt_score'] = score_days_on_market(agent_summary['
 #agent_summary['overall_score'] = (
 #    0.4 * agent_summary['volume_score'] +
 #    0.3 * agent_summary['close_rate_score'] +
-#    0.2 * agent_summary['avg_days_on_mkt_score'] +
+#    0.2 * agent_summary['avg_days_on_mkt_score'] + #['median_days_on_mkt_score']
 #    0.1 * agent_summary['pricing_accuracy_score']
 #)
 
@@ -72,7 +72,7 @@ if weight_volumne + weight_close + weight_days + weight_price !=1:
 agent_summary['overall_score'] = (
     weight_volumne * agent_summary['volume_score'] +
     weight_close * agent_summary['close_rate_score'] +
-    weight_days * agent_summary['avg_days_on_mkt_score'] +
+    weight_days * agent_summary['median_days_on_mkt_score'] + #avg_days_on_mkt_score
     weight_price * agent_summary['pricing_accuracy_score']
 )
 
