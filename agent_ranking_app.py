@@ -89,15 +89,15 @@ with left_col:
 
 with right_col:
     st.subheader("⚖️ Scoring Weights")
-    weight_vol = right_col.number_input("Transaction Volume", value=0.4)
+    weight_volumne = right_col.number_input("Transaction Volume", value=0.4)
     weight_close = right_col.number_input("Close Rate", value=0.3)
     weight_days = right_col.number_input("Days on Market", value=0.2)
     weight_price = right_col.number_input("Pricing Accuracy", value=0.1)
     
-    total_weight = weight_vol + weight_close + weight_days + weight_price
+    total_weight = weight_volumne + weight_close + weight_days + weight_price
     if total_weight != 1:
         st.warning("Weights do not sum to 1. Normalizing automatically.")
-        weight_vol /= total_weight
+        weight_volumne /= total_weight
         weight_close /= total_weight
         weight_days /= total_weight
         weight_price /= total_weight
