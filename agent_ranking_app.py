@@ -42,12 +42,12 @@ agent_summary['volume_score'] = percentile_score(agent_summary['total_records'])
 agent_summary['close_rate_score'] = percentile_score(agent_summary['close_rate'])
 agent_summary['avg_days_on_mkt_score'] = score_days_on_market(agent_summary['closed_daysonmarket_mean']) 
 agent_summary['median_days_on_mkt_score'] = score_days_on_market(agent_summary['closed_daysonmarket_median'])
-agent_summary['overall_score'] = (
-    0.4 * agent_summary['volume_score'] +
-    0.3 * agent_summary['close_rate_score'] +
-    0.2 * agent_summary['avg_days_on_mkt_score'] +
-    0.1 * agent_summary['pricing_accuracy_score']
-)
+#agent_summary['overall_score'] = (
+#    0.4 * agent_summary['volume_score'] +
+#    0.3 * agent_summary['close_rate_score'] +
+#    0.2 * agent_summary['avg_days_on_mkt_score'] +
+#    0.1 * agent_summary['pricing_accuracy_score']
+#)
 
 # --- UI Inputs ---
 st.title("Top Real Estate Agent Rankings")
@@ -58,6 +58,23 @@ max_price = st.number_input("Maximum Price", value=1_000_000)
 elementary = st.text_input("Elementary School")
 subdivision = st.text_input("Subdivision")
 min_volume = st.number_input("Minimum Total Transactions", value=0)
+
+weight_volumne = st.number_input("Weight on Transaction Volume", value=0.4)
+weight_close   = st.number_input("Weight on Close Rate", value=0.3)
+weight_days    = st.number_input("Weight on Avg Days on Market", value=0.2)
+weight_price   = st.number_input("Weight on Pricing Accuracy", value=0.1)
+if weight_volumne + weight_close + weight_days + weight_price !=1:
+    weight_volumne = 0.4
+    weight_close = 0.3
+    weight_days = 0.4
+    weight_price = 0.1
+
+agent_summary['overall_score'] = (
+    weight_volumne * agent_summary['volume_score'] +
+    weight_close * agent_summary['close_rate_score'] +
+    weight_days * agent_summary['avg_days_on_mkt_score'] +
+    weight_price * agent_summary['pricing_accuracy_score']
+)
 
 # --- Filtering ---
 df_filtered = data.copy()
