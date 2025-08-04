@@ -61,13 +61,13 @@ min_volume = st.number_input("Minimum Total Transactions", value=0)
 
 # --- Filtering ---
 df_filtered = data.copy()
-if zipcode:
+if zipcode and pd.notna(zipcode) and zipcode in df_filtered['PostalCode'].dropna().unique():
     df_filtered = df_filtered[df_filtered['PostalCode'] == zipcode]
 df_filtered = df_filtered[df_filtered['ClosePrice'] >= min_price]
 df_filtered = df_filtered[df_filtered['ClosePrice'] <= max_price]
-if elementary and elementary in df_filtered['ElementarySchool'].dropna().unique():
+if elementary and pd.notna(elementary) and elementary in df_filtered['ElementarySchool'].dropna().unique():
     df_filtered = df_filtered[df_filtered['ElementarySchool'] == elementary]
-if subdivision and subdivision in df_filtered['SubdivisionName'].dropna().unique():
+if subdivision and  pd.notna(subdivision) and subdivision in df_filtered['SubdivisionName'].dropna().unique():
     df_filtered = df_filtered[df_filtered['SubdivisionName'] == subdivision]
 
 selected_agents = agent_summary[
