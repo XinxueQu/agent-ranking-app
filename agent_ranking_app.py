@@ -131,29 +131,34 @@ selected_agents = agent_summary[
 #st.subheader("🏆 Top Ranked Agents")
 #st.dataframe(selected_agents.head(10), use_container_width=True)
 
-
-# --- Pagination ---
+# --- Pagination with Buttons ---
 records_per_page = 10
 num_agents = len(selected_agents)
-total_pages = (num_agents - 1) // records_per_page + 1
+total_pages = max((num_agents - 1) // records_per_page + 1, 1)
 
-if total_pages > 1:
-    page_num = st.number_input(
-        label="Page",
-        min_value=1,
-        max_value=total_pages,
-        value=1,
-        step=1,
-        format="%d"
-    )
-else:
-    page_num = 1
+# Initialize page state
+if "page_num" not in st.session_state:
+    st.session_state.page_num = 1
 
-start_idx = (page_num - 1) * records_per_page
+# Display navigation buttons
+col1, col2, col3 = st.columns([1, 2, 1])
+with col1:
+    if st.button("⬅️ Previous") and st.session_state.page_num > 1:
+        st.session_state.page_num -= 1
+with col3:
+    if st.button("Next ➡️") and st.session_state.page_num < total_pages:
+        st.session_state.page_num += 1
+
+# Slice data for current page
+start_idx = (st.session_state.page_num - 1) * records_per_page
 end_idx = start_idx + records_per_page
 paged_agents = selected_agents.iloc[start_idx:end_idx]
+
+# Show current page info
+st.caption(f"Showing page {st.session_state.page_num} of {total_pages} ({num_agents} agents found)")
 
 # --- Display Results ---
 st.subheader("🏆 Top Ranked Agents")
 st.caption(f"Showing page {page_num} of {total_pages} ({num_agents} agents found)")
 st.dataframe(paged_agents, use_container_width=True)
+
