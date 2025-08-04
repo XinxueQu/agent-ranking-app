@@ -61,7 +61,7 @@ min_volume = st.number_input("Minimum Total Transactions", value=0)
 
 weight_volumne = st.number_input("Weight on Transaction Volume", value=0.4)
 weight_close   = st.number_input("Weight on Close Rate", value=0.3)
-weight_days    = st.number_input("Weight on Avg Days on Market", value=0.2)
+weight_days    = st.number_input("Weight on Median Days on Market", value=0.2)
 weight_price   = st.number_input("Weight on Pricing Accuracy", value=0.1)
 if weight_volumne + weight_close + weight_days + weight_price !=1:
     weight_volumne = 0.4
