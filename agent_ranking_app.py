@@ -159,6 +159,5 @@ st.caption(f"Showing page {st.session_state.page_num} of {total_pages} ({num_age
 
 # --- Display Results ---
 st.subheader("🏆 Top Ranked Agents")
-st.caption(f"Showing page {page_num} of {total_pages} ({num_agents} agents found)")
+st.caption(f"Showing page {st.session_state.page_num} of {total_pages} ({num_agents} agents found)")
 st.dataframe(paged_agents, use_container_width=True)
-
