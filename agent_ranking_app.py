@@ -97,6 +97,9 @@ if submitted:
     rest = [c for c in selected_agents.columns if c not in first]
     selected_agents = selected_agents.loc[:, first + rest]
 
+    if "selected_agents" in st.session_state and not submitted:
+        selected_agents = st.session_state.selected_agents
+
     # --- Pagination state ---
     records_per_page = 10
     num_agents = len(selected_agents)
