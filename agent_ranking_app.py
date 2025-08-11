@@ -122,14 +122,17 @@ if elementary and pd.notna(elementary) and elementary in df_filtered['Elementary
 if subdivision and  pd.notna(subdivision) and subdivision in df_filtered['SubdivisionName'].dropna().unique():
     df_filtered = df_filtered[df_filtered['SubdivisionName'] == subdivision]
 
+filtered_agent_counts = df_filtered.groupby('ListAgentFullName', dropna=False).size().reset_index(name='n')
+filtered_agent_counts_selected = filtered_agent_counts[filtered_agent_counts['n'] >= min_volume]      # agents with > min_volume
+
 selected_agents = agent_summary[
-    (agent_summary['ListAgentFullName'].isin(df_filtered['ListAgentFullName'].unique())) &
-    (agent_summary['total_records'] >= min_volume)
+    (agent_summary['ListAgentFullName'].isin(filtered_agent_counts['ListAgentFullName'].unique())) #&
+    #(agent_summary['total_records'] >= min_volume)
 ].sort_values(by='overall_score', ascending=False)
 
-# --- Display Results ---
-#st.subheader("🏆 Top Ranked Agents")
-#st.dataframe(selected_agents.head(10), use_container_width=True)
+first = ['ListAgentFullName', 'overall_score']
+rest = [c for c in selected_agents.columns if c not in first]
+selected_agents = selected_agents.loc[:, first + rest]
 
 # --- Pagination with Buttons ---
 records_per_page = 10
