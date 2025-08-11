@@ -123,3 +123,47 @@ if submitted:
     with col3:
         if st.button("Next ➡️") and st.session_state.page_num < total_pages:
             st.session_state.page_num += 1
+
+# --- Build summary table from selected_agents + filtered data ---
+# Totals within the current filters
+    totals = df_filtered.groupby('ListAgentFullName', dropna=False).agg(
+              Total_Sales=('ClosePrice', 'sum'),
+              Closed_Transactions=('is_closed', 'sum')
+          ).reset_index()
+        
+    # % of sales in selected zipcode (agent's sales in zipcode / agent's total sales)
+    if zipcode:
+        sales_in_zip = (
+            df_filtered[df_filtered['PostalCode'] == zipcode]
+            .groupby('ListAgentFullName', dropna=False)['ClosePrice'].sum()
+            .rename('Sales_In_Zip')
+            .reset_index()
+        )
+    else:
+        sales_in_zip = totals[['ListAgentFullName']].assign(Sales_In_Zip=np.nan)
+    
+    # Join metrics already in selected_agents (close_rate, days on market, pricing accuracy)
+    tbl = (selected_agents
+           .merge(totals, on='ListAgentFullName', how='left')
+           .merge(sales_in_zip, on='ListAgentFullName', how='left'))
+    
+    tbl['%_Sales_in_Zip'] = (tbl['Sales_In_Zip'] / tbl['Total_Sales']).replace([np.inf, -np.inf], np.nan)
+    
+    # Ranks (descending, ties allowed)
+    tbl['Rank'] = tbl['overall_score'].rank(ascending=False, method='dense').astype(int)
+    tbl['Close Rate Rank'] = tbl['close_rate'].rank(ascending=False, method='dense').astype(int)
+    tbl['Days on Market Rank'] = tbl['closed_daysonmarket_median'].rank(ascending=False, method='dense').astype(int)
+    tbl['Pricing Accuracy Rank'] = tbl['avg_pricing_accuracy'].rank(ascending=False, method='dense').astype(int)
+    
+    # Final columns + display
+    final_cols = [
+        'Rank', 'ListAgentFullName', 'overall_score',
+        'Total_Sales', 'Closed_Transactions', '%_Sales_in_Zip',
+        'close_rate', 'closed_daysonmarket_median', 'avg_pricing_accuracy',
+        'Close Rate Rank', 'Days on Market Rank', 'Pricing Accuracy Rank'
+    ]
+    tbl = tbl[final_cols].sort_values(['Rank', 'overall_score'])
+    
+    st.subheader("📊 Summary by Agent (Filtered)")
+    st.dataframe(tbl, use_container_width=True)
+
