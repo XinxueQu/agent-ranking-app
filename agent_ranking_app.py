@@ -154,19 +154,20 @@ if "selected_agents" in st.session_state:
         if st.button("Next ➡️") and st.session_state.page_num < total_pages:
             st.session_state.page_num += 1
 
-    # -------------------- Summary table (from selected_agents + filtered data) --------------------
     # -------------------- Summary table (from agent_summary + filtered data) --------------------
     df_filtered = st.session_state.df_filtered  # from earlier step
     
-    # Denominator: total sales per agent within the CURRENT filtered slice
+    # Total sales & closed transactions within current filter
     totals = (
-        df_filtered.groupby('ListAgentFullName', dropna=False)['ClosePrice']
-        .sum()
-        .rename('Total_Sales')
+        df_filtered.groupby('ListAgentFullName', dropna=False)
+        .agg(
+            Total_Sales=('ClosePrice', 'sum'),
+            Closed_Transactions=('is_closed', 'sum')
+        )
         .reset_index()
     )
     
-    # Numerator: sales in the typed zipcode (normalize types for comparison)
+    # Sales in the entered zip code (normalized to string)
     if zipcode:
         z_str = str(zipcode).strip()
         sales_in_zip = (
@@ -179,21 +180,21 @@ if "selected_agents" in st.session_state:
     else:
         sales_in_zip = totals[['ListAgentFullName']].assign(Sales_In_Zip=np.nan)
     
-    # Build table using PRE-COMPUTED metrics from agent_summary / selected_agents
+    # Merge into final table
     tbl = (
-        selected_agents  # already derived from agent_summary and contains close_rate, med days, etc.
+        selected_agents
         .merge(totals, on='ListAgentFullName', how='left')
         .merge(sales_in_zip, on='ListAgentFullName', how='left')
     )
     
     tbl['%_Sales_in_Zip'] = (tbl['Sales_In_Zip'] / tbl['Total_Sales']).replace([np.inf, -np.inf], np.nan)
     
-      # Ranks (descending, ties allowed)
+    # Ranks (descending, ties allowed)
     tbl['Rank'] = tbl['overall_score'].rank(ascending=False, method='dense').astype(int)
     tbl['Close Rate Rank'] = tbl['close_rate'].rank(ascending=False, method='dense').astype(int)
     tbl['Days on Market Rank'] = tbl['closed_daysonmarket_median'].rank(ascending=False, method='dense').astype(int)
     tbl['Pricing Accuracy Rank'] = tbl['avg_pricing_accuracy'].rank(ascending=False, method='dense').astype(int)
-
+    
     final_cols = [
         'Rank', 'ListAgentFullName', 'overall_score',
         'Total_Sales', 'Closed_Transactions', '%_Sales_in_Zip',
