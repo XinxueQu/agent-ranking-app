@@ -188,12 +188,19 @@ if "selected_agents" in st.session_state:
     
     tbl['%_Sales_in_Zip'] = (tbl['Sales_In_Zip'] / tbl['Total_Sales']).replace([np.inf, -np.inf], np.nan)
     
+      # Ranks (descending, ties allowed)
+    tbl['Rank'] = tbl['overall_score'].rank(ascending=False, method='dense').astype(int)
+    tbl['Close Rate Rank'] = tbl['close_rate'].rank(ascending=False, method='dense').astype(int)
+    tbl['Days on Market Rank'] = tbl['closed_daysonmarket_median'].rank(ascending=False, method='dense').astype(int)
+    tbl['Pricing Accuracy Rank'] = tbl['avg_pricing_accuracy'].rank(ascending=False, method='dense').astype(int)
+
     final_cols = [
-        'ListAgentFullName', 'overall_score',
+        'Rank', 'ListAgentFullName', 'overall_score',
+        'Total_Sales', 'Closed_Transactions', '%_Sales_in_Zip',
         'close_rate', 'closed_daysonmarket_median', 'avg_pricing_accuracy',
-        '%_Sales_in_Zip'
+        'Close Rate Rank', 'Days on Market Rank', 'Pricing Accuracy Rank'
     ]
-    tbl = tbl[final_cols].sort_values('overall_score', ascending=False)
+    tbl = tbl[final_cols].sort_values(['Rank', 'overall_score'])
     
     st.subheader("📊 Summary by Agent (Filtered)")
     st.dataframe(tbl, use_container_width=True)
