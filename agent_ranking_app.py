@@ -179,7 +179,7 @@ if "selected_agents" in st.session_state:
         .merge(sales_in_zip, on='ListAgentFullName', how='left')
     )
     
-    tbl['%_Sales_in_Zip'] = (tbl['Sales_In_Zip'] / tbl['Total_Sales']).replace([np.inf, -np.inf], np.nan)
+    tbl['%_Sales_in_Zip'] = (tbl['Sales_In_Zip'] / tbl['total_sales']).replace([np.inf, -np.inf], np.nan)
     
     # Ranks (descending, ties allowed)
     tbl['Rank'] = tbl['overall_score'].rank(ascending=False, method='dense').astype(int)
