@@ -28,6 +28,7 @@ def build_agent_summary(df: pd.DataFrame) -> pd.DataFrame:
         df.groupby('ListAgentFullName', dropna=False)
         .agg(
             total_records=('ListAgentFullName', 'count'),
+            total_sales = ('ClosePrice', 'sum'),
             closed_count=('is_closed', 'sum'),
             closed_daysonmarket_mean=('DaysOnMarket', lambda x: x[df.loc[x.index, 'is_closed']].mean()),
             closed_daysonmarket_median=('DaysOnMarket', lambda x: x[df.loc[x.index, 'is_closed']].median()),
@@ -37,6 +38,7 @@ def build_agent_summary(df: pd.DataFrame) -> pd.DataFrame:
     )
     agent_summary['close_rate']               = agent_summary['closed_count'] / agent_summary['total_records']
     agent_summary['pricing_accuracy_score']   = agent_summary['avg_pricing_accuracy'].apply(pricing_accuracy_score)
+    agent_summary['sales_score']             = percentile_score(agent_summary['total_sales'])
     agent_summary['volume_score']             = percentile_score(agent_summary['total_records'])
     agent_summary['close_rate_score']         = percentile_score(agent_summary['close_rate'])
     agent_summary['avg_days_on_mkt_score']    = score_days_on_market(agent_summary['closed_daysonmarket_mean'])
@@ -157,16 +159,7 @@ if "selected_agents" in st.session_state:
     # -------------------- Summary table (from agent_summary + filtered data) --------------------
     df_filtered = st.session_state.df_filtered  # from earlier step
     
-    # Total sales & closed transactions within current filter
-    totals = (
-        agent_summary.groupby('ListAgentFullName', dropna=False)
-        .agg(
-            Total_Sales=('ClosePrice', 'sum'),
-            Closed_Transactions=('is_closed', 'sum')
-        )
-        .reset_index()
-    )
-    
+  
     # Sales in the entered zip code (normalized to string)
     if zipcode:
         z_str = str(zipcode).strip()
@@ -183,7 +176,6 @@ if "selected_agents" in st.session_state:
     # Merge into final table
     tbl = (
         selected_agents
-        .merge(totals, on='ListAgentFullName', how='left')
         .merge(sales_in_zip, on='ListAgentFullName', how='left')
     )
     
@@ -197,7 +189,8 @@ if "selected_agents" in st.session_state:
     
     final_cols = [
         'Rank', 'ListAgentFullName', 'overall_score',
-        'Total_Sales', 'Closed_Transactions', '%_Sales_in_Zip',
+        'total_sales', 'closed_count', 
+        '%_Sales_in_Zip',
         'close_rate', 'closed_daysonmarket_median', 'avg_pricing_accuracy',
         'Close Rate Rank', 'Days on Market Rank', 'Pricing Accuracy Rank'
     ]
