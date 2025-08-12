@@ -155,46 +155,46 @@ if "selected_agents" in st.session_state:
             st.session_state.page_num += 1
 
     # -------------------- Summary table (from selected_agents + filtered data) --------------------
-    df_filtered = st.session_state.df_filtered
-
+    # -------------------- Summary table (from agent_summary + filtered data) --------------------
+    df_filtered = st.session_state.df_filtered  # from earlier step
+    
+    # Denominator: total sales per agent within the CURRENT filtered slice
     totals = (
-        df_filtered.groupby('ListAgentFullName', dropna=False)
-        .agg(Total_Sales=('ClosePrice', 'sum'),
-             Closed_Transactions=('is_closed', 'sum'))
+        df_filtered.groupby('ListAgentFullName', dropna=False)['ClosePrice']
+        .sum()
+        .rename('Total_Sales')
         .reset_index()
     )
-
+    
+    # Numerator: sales in the typed zipcode (normalize types for comparison)
     if zipcode:
+        z_str = str(zipcode).strip()
         sales_in_zip = (
-            df_filtered[df_filtered['PostalCode'] == zipcode]
-            .groupby('ListAgentFullName', dropna=False)['ClosePrice'].sum()
+            df_filtered[df_filtered['PostalCode'].astype(str).str.strip() == z_str]
+            .groupby('ListAgentFullName', dropna=False)['ClosePrice']
+            .sum()
             .rename('Sales_In_Zip')
             .reset_index()
         )
     else:
         sales_in_zip = totals[['ListAgentFullName']].assign(Sales_In_Zip=np.nan)
-
-    tbl = (selected_agents
-           .merge(totals, on='ListAgentFullName', how='left')
-           .merge(sales_in_zip, on='ListAgentFullName', how='left'))
-
+    
+    # Build table using PRE-COMPUTED metrics from agent_summary / selected_agents
+    tbl = (
+        selected_agents  # already derived from agent_summary and contains close_rate, med days, etc.
+        .merge(totals, on='ListAgentFullName', how='left')
+        .merge(sales_in_zip, on='ListAgentFullName', how='left')
+    )
+    
     tbl['%_Sales_in_Zip'] = (tbl['Sales_In_Zip'] / tbl['Total_Sales']).replace([np.inf, -np.inf], np.nan)
-
-    # Ranks (descending, ties allowed)
-    tbl['Rank'] = tbl['overall_score'].rank(ascending=False, method='dense').astype(int)
-    tbl['Close Rate Rank'] = tbl['close_rate'].rank(ascending=False, method='dense').astype(int)
-    tbl['Days on Market Rank'] = tbl['closed_daysonmarket_median'].rank(ascending=False, method='dense').astype(int)
-    tbl['Pricing Accuracy Rank'] = tbl['avg_pricing_accuracy'].rank(ascending=False, method='dense').astype(int)
-
+    
     final_cols = [
-        'Rank', 'ListAgentFullName', 'overall_score',
-        'Total_Sales', 'Closed_Transactions', '%_Sales_in_Zip',
+        'ListAgentFullName', 'overall_score',
         'close_rate', 'closed_daysonmarket_median', 'avg_pricing_accuracy',
-        'Close Rate Rank', 'Days on Market Rank', 'Pricing Accuracy Rank'
+        '%_Sales_in_Zip'
     ]
-    tbl = tbl[final_cols].sort_values(['Rank', 'overall_score'])
-
+    tbl = tbl[final_cols].sort_values('overall_score', ascending=False)
+    
     st.subheader("📊 Summary by Agent (Filtered)")
     st.dataframe(tbl, use_container_width=True)
-else:
-    st.info("Fill the filters and click **Run Rankings** to see results.")
+
