@@ -159,7 +159,7 @@ if "selected_agents" in st.session_state:
     
     # Total sales & closed transactions within current filter
     totals = (
-        df_filtered.groupby('ListAgentFullName', dropna=False)
+        agent_summary.groupby('ListAgentFullName', dropna=False)
         .agg(
             Total_Sales=('ClosePrice', 'sum'),
             Closed_Transactions=('is_closed', 'sum')
