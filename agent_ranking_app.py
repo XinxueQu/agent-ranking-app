@@ -35,11 +35,11 @@ def build_agent_summary(df: pd.DataFrame) -> pd.DataFrame:
         )
         .reset_index()
     )
-    agent_summary['close_rate'] = agent_summary['closed_count'] / agent_summary['total_records']
-    agent_summary['pricing_accuracy_score'] = agent_summary['avg_pricing_accuracy'].apply(pricing_accuracy_score)
-    agent_summary['volume_score'] = percentile_score(agent_summary['total_records'])
-    agent_summary['close_rate_score'] = percentile_score(agent_summary['close_rate'])
-    agent_summary['avg_days_on_mkt_score'] = score_days_on_market(agent_summary['closed_daysonmarket_mean'])
+    agent_summary['close_rate']               = agent_summary['closed_count'] / agent_summary['total_records']
+    agent_summary['pricing_accuracy_score']   = agent_summary['avg_pricing_accuracy'].apply(pricing_accuracy_score)
+    agent_summary['volume_score']             = percentile_score(agent_summary['total_records'])
+    agent_summary['close_rate_score']         = percentile_score(agent_summary['close_rate'])
+    agent_summary['avg_days_on_mkt_score']    = score_days_on_market(agent_summary['closed_daysonmarket_mean'])
     agent_summary['median_days_on_mkt_score'] = score_days_on_market(agent_summary['closed_daysonmarket_median'])
     return agent_summary
 
