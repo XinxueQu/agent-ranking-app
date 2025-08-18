@@ -194,8 +194,8 @@ if "selected_agents" in st.session_state:
     
     final_cols = [
         'Rank', 'ListAgentFullName', 'overall_score',
-        'Total Sales ($)', 'Total Sales Rank',
-        'Closed Transactions', 'Closed Transactions Rank'
+        'total_sales', 'Total Sales Rank',
+        'closed_count', 'Closed Transactions Rank'
         '%_Sales_in_Zip',
         'close_rate', 'Close Rate Rank',
         'closed_daysonmarket_median',  'Days on Market Rank', 
