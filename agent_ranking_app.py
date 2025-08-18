@@ -186,13 +186,20 @@ if "selected_agents" in st.session_state:
     tbl['Close Rate Rank'] = tbl['close_rate'].rank(ascending=False, method='dense').astype(int)
     tbl['Days on Market Rank'] = tbl['closed_daysonmarket_median'].rank(ascending=False, method='dense').astype(int)
     tbl['Pricing Accuracy Rank'] = tbl['avg_pricing_accuracy'].rank(ascending=False, method='dense').astype(int)
+
+    # 🔹 New ranking columns
+    tbl['Total Sales Rank'] = tbl['total_sales'].rank(ascending=False, method='dense').astype(int)
+    tbl['Closed Count Rank'] = tbl['closed_count'].rank(ascending=False, method='dense').astype(int)
+
     
     final_cols = [
         'Rank', 'ListAgentFullName', 'overall_score',
-        'total_sales', 'closed_count', 
+        'Total Sales ($)', 'Total Sales Rank',
+        'Closed Transactions', 'Closed Transactions Rank'
         '%_Sales_in_Zip',
-        'close_rate', 'closed_daysonmarket_median', 'avg_pricing_accuracy',
-        'Close Rate Rank', 'Days on Market Rank', 'Pricing Accuracy Rank'
+        'close_rate', 'Close Rate Rank',
+        'closed_daysonmarket_median',  'Days on Market Rank', 
+        'avg_pricing_accuracy',    'Pricing Accuracy Rank'
     ]
     tbl = tbl[final_cols].sort_values(['Rank', 'overall_score'])
     
