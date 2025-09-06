@@ -147,51 +147,55 @@ if submitted:
 if not submitted and "selected_agents" in st.session_state:
     selected_agents = st.session_state.selected_agents
 
-if "selected_agents" in st.session_state:
-    selected_agents = st.session_state.selected_agents
-    df_filtered = st.session_state.df_filtered  # from earlier step
+# -- Always show the view selector so users can click the second view even before ranking --
+active_tab = st.radio(
+    "View",
+    ["🏆 Rankings", "📐 Multi-dimension view"],
+    horizontal=True,
+    index=0 if st.session_state.active_tab == "🏆 Rankings" else 1,
+    key="active_tab",
+)
 
-    # --- Pagination state ---
-    records_per_page = 10
-    num_agents = len(selected_agents)
-    total_pages = max((num_agents - 1) // records_per_page + 1, 1)
+# Short-circuit if we don't have results yet
+if "selected_agents" not in st.session_state:
+    st.info("Run Rankings to see results.")
+    st.stop()
 
-    if "page_num" not in st.session_state:
-        st.session_state.page_num = 1
+selected_agents = st.session_state.selected_agents
+df_filtered = st.session_state.df_filtered
 
-    start_idx = (st.session_state.page_num - 1) * records_per_page
-    end_idx = start_idx + records_per_page
-    paged_agents = selected_agents.iloc[start_idx:end_idx]
+# --- Pagination state (used by Rankings tab) ---
+records_per_page = 10
+num_agents = len(selected_agents)
+total_pages = max((num_agents - 1) // records_per_page + 1, 1)
+if "page_num" not in st.session_state:
+    st.session_state.page_num = 1
 
-    # ---- Tab selector (stateful) ----
-    active_tab = st.radio(
-        "View",
-        ["🏆 Rankings", "📐 Multi-dimension view"],
-        horizontal=True,
-        index=0 if st.session_state.active_tab == "🏆 Rankings" else 1,
-        key="active_tab",
-    )
+start_idx = (st.session_state.page_num - 1) * records_per_page
+end_idx = start_idx + records_per_page
+paged_agents = selected_agents.iloc[start_idx:end_idx]
 
-    # ---------- Tab 1: Rankings ----------
-    if st.session_state.active_tab == "🏆 Rankings":
-        st.subheader("🏆 Top Ranked Agents")
+# ---------- Tab 1: Rankings ----------
+if st.session_state.active_tab == "🏆 Rankings":
+    st.subheader("🏆 Top Ranked Agents")
+
+    if num_agents == 0:
+        st.warning("No agents matched your filters. Adjust filters and re-run.")
+    else:
         st.dataframe(paged_agents, use_container_width=True, height=420)
         st.caption(f"Showing page {st.session_state.page_num} of {total_pages} ({num_agents} agents found)")
-    
+
         col1, _, col3 = st.columns([1, 2, 1])
         with col1:
-            if st.button("⬅️ Previous"):
-                if st.session_state.page_num > 1:
-                    st.session_state.page_num -= 1
-                    st.rerun()
+            if st.button("⬅️ Previous") and st.session_state.page_num > 1:
+                st.session_state.page_num -= 1
+                st.rerun()
         with col3:
-            if st.button("Next ➡️"):
-                if st.session_state.page_num < total_pages:
-                    st.session_state.page_num += 1
-                    st.rerun()
+            if st.button("Next ➡️") and st.session_state.page_num < total_pages:
+                st.session_state.page_num += 1
+                st.rerun()
 
-        # ----- Summary table (your existing code, with one small fix) -----
-        # Sales in the entered zip code (normalized to string)
+        # ----- Summary table -----
         if 'zipcode' in locals() and zipcode:
             z_str = str(zipcode).strip()
             sales_in_zip = (
@@ -202,20 +206,17 @@ if "selected_agents" in st.session_state:
                 .reset_index()
             )
         else:
-            # FIX: use selected_agents, not an undefined "totals"
             sales_in_zip = selected_agents[['ListAgentFullName']].assign(Sales_In_Zip=np.nan)
 
         tbl = selected_agents.merge(sales_in_zip, on='ListAgentFullName', how='left')
         tbl['%_Sales_in_Zip'] = (tbl['Sales_In_Zip'] / tbl['total_sales']).replace([np.inf, -np.inf], np.nan)
 
-        # Ranks (descending, ties allowed)
-        tbl['Rank'] = tbl['overall_score'].rank(ascending=False, method='dense').astype(int)
-        tbl['Close Rate Rank'] = tbl['close_rate'].rank(ascending=False, method='dense').astype(int)
-        # lower days-on-market is better → rank ascending=False over the *score* you built
+        tbl['Rank']                = tbl['overall_score'].rank(ascending=False, method='dense').astype(int)
+        tbl['Close Rate Rank']     = tbl['close_rate'].rank(ascending=False, method='dense').astype(int)
         tbl['Days on Market Rank'] = tbl['closed_daysonmarket_median'].rank(ascending=True, method='dense').astype(int)
-        tbl['Pricing Accuracy Rank'] = tbl['avg_pricing_accuracy'].rank(ascending=False, method='dense').astype(int)
-        tbl['Total Sales Rank'] = tbl['total_sales'].rank(ascending=False, method='dense').astype(int)
-        tbl['Closed Count Rank'] = tbl['closed_count'].rank(ascending=False, method='dense').astype(int)
+        tbl['Pricing Accuracy Rank']= tbl['avg_pricing_accuracy'].rank(ascending=False, method='dense').astype(int)
+        tbl['Total Sales Rank']    = tbl['total_sales'].rank(ascending=False, method='dense').astype(int)
+        tbl['Closed Count Rank']   = tbl['closed_count'].rank(ascending=False, method='dense').astype(int)
 
         final_cols = [
             'Rank', 'ListAgentFullName', 'overall_score',
@@ -230,49 +231,53 @@ if "selected_agents" in st.session_state:
         st.subheader("📊 Summary by Agent (Filtered)")
         st.dataframe(tbl, use_container_width=True)
 
-    # ---------- Tab 2: Multi-dimension view ----------
-    elif st.session_state.active_tab == "📐 Multi-dimension view":
-        st.subheader("📐 Agent rating by dimension")
-    
-        agent_to_view = st.selectbox(
-            "Choose an agent",
-            options=selected_agents["ListAgentFullName"].tolist(),
-            key="agent_to_view",
-            on_change=focus_dims,  # <-- keep focus on this tab after change
-        )
-        row = selected_agents.loc[selected_agents["ListAgentFullName"] == agent_to_view].iloc[0]
+# ---------- Tab 2: Multi-dimension view ----------
+elif st.session_state.active_tab == "📐 Multi-dimension view":
+    st.subheader("📐 Agent rating by dimension")
 
-        # Collect dimension scores you already compute
-        dims = {
-            "Volume": row["volume_score"],
-            "Close Rate": row["close_rate_score"],
-            "Days on Market (↓)": row["median_days_on_mkt_score"],
-            "Pricing Accuracy": row["pricing_accuracy_score"],
-        }
-        # include if present
-        if "sales_score" in selected_agents.columns:
-            dims["Total Sales"] = row["sales_score"]
+    if num_agents == 0:
+        st.warning("No agents matched your filters. Adjust filters and re-run.")
+        st.stop()
 
-        dim_df = pd.DataFrame({"Dimension": list(dims.keys()), "Score": list(dims.values())}).dropna()
+    # Select agent; keep focus on this view after change
+    agent_to_view = st.selectbox(
+        "Choose an agent",
+        options=selected_agents["ListAgentFullName"].tolist(),
+        key="agent_to_view",
+        on_change=focus_dims,
+    )
 
-        # Bar chart
+    if not agent_to_view:
+        st.info("Pick an agent to render charts.")
+        st.stop()
+
+    row = selected_agents.loc[selected_agents["ListAgentFullName"] == agent_to_view].iloc[0]
+
+    # Build dims safely (NOTE: correct column name 'median_dayson_mkt_score')
+    dims = {
+        "Volume": row.get("volume_score", np.nan),
+        "Close Rate": row.get("close_rate_score", np.nan),
+        "Days on Market (↓)": row.get("median_dayson_mkt_score", np.nan),
+        "Pricing Accuracy": row.get("pricing_accuracy_score", np.nan),
+    }
+    if "sales_score" in row.index:
+        dims["Total Sales"] = row["sales_score"]
+
+    dim_df = pd.DataFrame({"Dimension": list(dims.keys()), "Score": list(dims.values())}).dropna()
+
+    if dim_df.empty:
+        st.warning("No dimension scores available for this agent. Re-run Rankings to refresh.")
+    else:
         fig_bar = px.bar(dim_df, x="Dimension", y="Score", range_y=[0, 100])
         st.plotly_chart(fig_bar, use_container_width=True)
 
-        # Optional radar (needs ≥ 3 points)
         if len(dim_df) >= 3:
             r = dim_df["Score"].tolist()
             theta = dim_df["Dimension"].tolist()
-            fig_radar = go.Figure(
-                data=go.Scatterpolar(r=r + [r[0]], theta=theta + [theta[0]], fill="toself")
-            )
-            fig_radar.update_layout(
-                polar=dict(radialaxis=dict(range=[0, 100], showticklabels=True)),
-                showlegend=False
-            )
+            fig_radar = go.Figure(data=go.Scatterpolar(r=r + [r[0]], theta=theta + [theta[0]], fill="toself"))
+            fig_radar.update_layout(polar=dict(radialaxis=dict(range=[0, 100], showticklabels=True)), showlegend=False)
             st.plotly_chart(fig_radar, use_container_width=True)
 
-        # Underlying metrics table for that agent
         cols_raw = [
             "total_records", "closed_count", "close_rate",
             "closed_daysonmarket_mean", "closed_daysonmarket_median",
