@@ -268,15 +268,15 @@ elif st.session_state.active_tab == "📐 Multi-dimension view":
     if dim_df.empty:
         st.warning("No dimension scores available for this agent. Re-run Rankings to refresh.")
     else:
-        fig_bar = px.bar(dim_df, x="Dimension", y="Score", range_y=[0, 100])
-        st.plotly_chart(fig_bar, use_container_width=True)
-
         if len(dim_df) >= 3:
             r = dim_df["Score"].tolist()
             theta = dim_df["Dimension"].tolist()
             fig_radar = go.Figure(data=go.Scatterpolar(r=r + [r[0]], theta=theta + [theta[0]], fill="toself"))
             fig_radar.update_layout(polar=dict(radialaxis=dict(range=[0, 100], showticklabels=True)), showlegend=False)
             st.plotly_chart(fig_radar, use_container_width=True)
+
+        fig_bar = px.bar(dim_df, x="Dimension", y="Score", range_y=[0, 100])
+        st.plotly_chart(fig_bar, use_container_width=True)
 
         cols_raw = [
             "total_records", "closed_count", "close_rate",
