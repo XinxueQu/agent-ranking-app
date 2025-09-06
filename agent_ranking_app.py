@@ -1,6 +1,9 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import plotly.express as px
+import plotly.graph_objects as go
+
 
 st.set_page_config(page_title="Agent Rankings", layout="wide")
 st.markdown("<h1 style='text-align: center; color: darkblue;'>🏡 Top Real Estate Agent Rankings</h1>", unsafe_allow_html=True)
@@ -132,6 +135,9 @@ if not submitted and "selected_agents" in st.session_state:
     selected_agents = st.session_state.selected_agents
 
 if "selected_agents" in st.session_state:
+    selected_agents = st.session_state.selected_agents
+    df_filtered = st.session_state.df_filtered  # from earlier step
+
     # --- Pagination state ---
     records_per_page = 10
     num_agents = len(selected_agents)
@@ -144,65 +150,115 @@ if "selected_agents" in st.session_state:
     end_idx = start_idx + records_per_page
     paged_agents = selected_agents.iloc[start_idx:end_idx]
 
-    st.subheader("🏆 Top Ranked Agents")
-    st.dataframe(paged_agents, use_container_width=True, height=420)
-    st.caption(f"Showing page {st.session_state.page_num} of {total_pages} ({num_agents} agents found)")
+    # ============ TABS ============
+    tab_rank, tab_dims = st.tabs(["🏆 Rankings", "📐 Multi-dimension view"])
 
-    col1, _, col3 = st.columns([1, 2, 1])
-    with col1:
-        if st.button("⬅️ Previous") and st.session_state.page_num > 1:
-            st.session_state.page_num -= 1
-    with col3:
-        if st.button("Next ➡️") and st.session_state.page_num < total_pages:
-            st.session_state.page_num += 1
+    # ---------- Tab 1: Rankings ----------
+    with tab_rank:
+        st.subheader("🏆 Top Ranked Agents")
+        st.dataframe(paged_agents, use_container_width=True, height=420)
+        st.caption(f"Showing page {st.session_state.page_num} of {total_pages} ({num_agents} agents found)")
 
-    # -------------------- Summary table (from agent_summary + filtered data) --------------------
-    df_filtered = st.session_state.df_filtered  # from earlier step
-    
-  
-    # Sales in the entered zip code (normalized to string)
-    if zipcode:
-        z_str = str(zipcode).strip()
-        sales_in_zip = (
-            df_filtered[df_filtered['PostalCode'].astype(str).str.strip() == z_str]
-            .groupby('ListAgentFullName', dropna=False)['ClosePrice']
-            .sum()
-            .rename('Sales_In_Zip')
-            .reset_index()
+        col1, _, col3 = st.columns([1, 2, 1])
+        with col1:
+            if st.button("⬅️ Previous") and st.session_state.page_num > 1:
+                st.session_state.page_num -= 1
+        with col3:
+            if st.button("Next ➡️") and st.session_state.page_num < total_pages:
+                st.session_state.page_num += 1
+
+        # ----- Summary table (your existing code, with one small fix) -----
+        # Sales in the entered zip code (normalized to string)
+        if 'zipcode' in locals() and zipcode:
+            z_str = str(zipcode).strip()
+            sales_in_zip = (
+                df_filtered[df_filtered['PostalCode'].astype(str).str.strip() == z_str]
+                .groupby('ListAgentFullName', dropna=False)['ClosePrice']
+                .sum()
+                .rename('Sales_In_Zip')
+                .reset_index()
+            )
+        else:
+            # FIX: use selected_agents, not an undefined "totals"
+            sales_in_zip = selected_agents[['ListAgentFullName']].assign(Sales_In_Zip=np.nan)
+
+        tbl = selected_agents.merge(sales_in_zip, on='ListAgentFullName', how='left')
+        tbl['%_Sales_in_Zip'] = (tbl['Sales_In_Zip'] / tbl['total_sales']).replace([np.inf, -np.inf], np.nan)
+
+        # Ranks (descending, ties allowed)
+        tbl['Rank'] = tbl['overall_score'].rank(ascending=False, method='dense').astype(int)
+        tbl['Close Rate Rank'] = tbl['close_rate'].rank(ascending=False, method='dense').astype(int)
+        # lower days-on-market is better → rank ascending=False over the *score* you built
+        tbl['Days on Market Rank'] = tbl['closed_daysonmarket_median'].rank(ascending=True, method='dense').astype(int)
+        tbl['Pricing Accuracy Rank'] = tbl['avg_pricing_accuracy'].rank(ascending=False, method='dense').astype(int)
+        tbl['Total Sales Rank'] = tbl['total_sales'].rank(ascending=False, method='dense').astype(int)
+        tbl['Closed Count Rank'] = tbl['closed_count'].rank(ascending=False, method='dense').astype(int)
+
+        final_cols = [
+            'Rank', 'ListAgentFullName', 'overall_score',
+            'total_sales', 'Total Sales Rank',
+            'closed_count', 'Closed Count Rank',
+            '%_Sales_in_Zip',
+            'close_rate', 'Close Rate Rank',
+            'closed_daysonmarket_median', 'Days on Market Rank',
+            'avg_pricing_accuracy', 'Pricing Accuracy Rank'
+        ]
+        tbl = tbl[final_cols].sort_values(['Rank', 'overall_score'])
+        st.subheader("📊 Summary by Agent (Filtered)")
+        st.dataframe(tbl, use_container_width=True)
+
+    # ---------- Tab 2: Multi-dimension view ----------
+    with tab_dims:
+        st.subheader("📐 Agent rating by dimension")
+
+        # let the user pick an agent to visualize
+        agent_to_view = st.selectbox(
+            "Choose an agent",
+            options=selected_agents["ListAgentFullName"].tolist()
         )
-    else:
-        sales_in_zip = totals[['ListAgentFullName']].assign(Sales_In_Zip=np.nan)
-    
-    # Merge into final table
-    tbl = (
-        selected_agents
-        .merge(sales_in_zip, on='ListAgentFullName', how='left')
-    )
-    
-    tbl['%_Sales_in_Zip'] = (tbl['Sales_In_Zip'] / tbl['total_sales']).replace([np.inf, -np.inf], np.nan)
-    
-    # Ranks (descending, ties allowed)
-    tbl['Rank'] = tbl['overall_score'].rank(ascending=False, method='dense').astype(int)
-    tbl['Close Rate Rank'] = tbl['close_rate'].rank(ascending=False, method='dense').astype(int)
-    tbl['Days on Market Rank'] = tbl['closed_daysonmarket_median'].rank(ascending=False, method='dense').astype(int)
-    tbl['Pricing Accuracy Rank'] = tbl['avg_pricing_accuracy'].rank(ascending=False, method='dense').astype(int)
+        row = selected_agents.loc[selected_agents["ListAgentFullName"] == agent_to_view].iloc[0]
 
-    # 🔹 New ranking columns
-    tbl['Total Sales Rank'] = tbl['total_sales'].rank(ascending=False, method='dense').astype(int)
-    tbl['Closed Count Rank'] = tbl['closed_count'].rank(ascending=False, method='dense').astype(int)
+        # Collect dimension scores you already compute
+        dims = {
+            "Volume": row["volume_score"],
+            "Close Rate": row["close_rate_score"],
+            "Days on Market (↓)": row["median_dayson_mkt_score"],
+            "Pricing Accuracy": row["pricing_accuracy_score"],
+        }
+        # include if present
+        if "sales_score" in selected_agents.columns:
+            dims["Total Sales"] = row["sales_score"]
 
-    
-    final_cols = [
-        'Rank', 'ListAgentFullName', 'overall_score',
-        'total_sales', 'Total Sales Rank',
-        'closed_count', 'Closed Count Rank',
-        '%_Sales_in_Zip',
-        'close_rate', 'Close Rate Rank',
-        'closed_daysonmarket_median',  'Days on Market Rank', 
-        'avg_pricing_accuracy',    'Pricing Accuracy Rank'
-    ]
-    tbl = tbl[final_cols].sort_values(['Rank', 'overall_score'])
-    
-    st.subheader("📊 Summary by Agent (Filtered)")
-    st.dataframe(tbl, use_container_width=True)
+        dim_df = pd.DataFrame({"Dimension": list(dims.keys()), "Score": list(dims.values())}).dropna()
+
+        # Bar chart
+        fig_bar = px.bar(dim_df, x="Dimension", y="Score", range_y=[0, 100])
+        st.plotly_chart(fig_bar, use_container_width=True)
+
+        # Optional radar (needs ≥ 3 points)
+        if len(dim_df) >= 3:
+            r = dim_df["Score"].tolist()
+            theta = dim_df["Dimension"].tolist()
+            fig_radar = go.Figure(
+                data=go.Scatterpolar(r=r + [r[0]], theta=theta + [theta[0]], fill="toself")
+            )
+            fig_radar.update_layout(
+                polar=dict(radialaxis=dict(range=[0, 100], showticklabels=True)),
+                showlegend=False
+            )
+            st.plotly_chart(fig_radar, use_container_width=True)
+
+        # Underlying metrics table for that agent
+        cols_raw = [
+            "total_records", "closed_count", "close_rate",
+            "closed_daysonmarket_mean", "closed_daysonmarket_median",
+            "avg_pricing_accuracy", "total_sales"
+        ]
+        cols_raw = [c for c in cols_raw if c in selected_agents.columns]
+        st.caption("Underlying metrics")
+        st.dataframe(
+            selected_agents[selected_agents["ListAgentFullName"] == agent_to_view][["ListAgentFullName"] + cols_raw],
+            use_container_width=True
+        )
+
 
