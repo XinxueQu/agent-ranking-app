@@ -222,7 +222,7 @@ if "selected_agents" in st.session_state:
         dims = {
             "Volume": row["volume_score"],
             "Close Rate": row["close_rate_score"],
-            "Days on Market (↓)": row["median_dayson_mkt_score"],
+            "Days on Market (↓)": row["median_days_on_mkt_score"],
             "Pricing Accuracy": row["pricing_accuracy_score"],
         }
         # include if present
