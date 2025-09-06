@@ -5,6 +5,19 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 
+# ---- near the top (after imports) ----
+if "active_tab" not in st.session_state:
+    st.session_state.active_tab = "🏆 Rankings"
+
+def focus_dims():
+    st.session_state.active_tab = "📐 Multi-dimension view"
+
+def focus_rankings():
+    st.session_state.active_tab = "🏆 Rankings"
+
+
+
+
 st.set_page_config(page_title="Agent Rankings", layout="wide")
 st.markdown("<h1 style='text-align: center; color: darkblue;'>🏡 Top Real Estate Agent Rankings</h1>", unsafe_allow_html=True)
 
@@ -150,22 +163,32 @@ if "selected_agents" in st.session_state:
     end_idx = start_idx + records_per_page
     paged_agents = selected_agents.iloc[start_idx:end_idx]
 
-    # ============ TABS ============
-    tab_rank, tab_dims = st.tabs(["🏆 Rankings", "📐 Multi-dimension view"])
+    # ---- Tab selector (stateful) ----
+    active_tab = st.radio(
+        "View",
+        ["🏆 Rankings", "📐 Multi-dimension view"],
+        horizontal=True,
+        index=0 if st.session_state.active_tab == "🏆 Rankings" else 1,
+        key="active_tab",
+    )
 
     # ---------- Tab 1: Rankings ----------
-    with tab_rank:
+    if st.session_state.active_tab == "🏆 Rankings":
         st.subheader("🏆 Top Ranked Agents")
         st.dataframe(paged_agents, use_container_width=True, height=420)
         st.caption(f"Showing page {st.session_state.page_num} of {total_pages} ({num_agents} agents found)")
-
+    
         col1, _, col3 = st.columns([1, 2, 1])
         with col1:
-            if st.button("⬅️ Previous") and st.session_state.page_num > 1:
-                st.session_state.page_num -= 1
+            if st.button("⬅️ Previous"):
+                if st.session_state.page_num > 1:
+                    st.session_state.page_num -= 1
+                    st.rerun()
         with col3:
-            if st.button("Next ➡️") and st.session_state.page_num < total_pages:
-                st.session_state.page_num += 1
+            if st.button("Next ➡️"):
+                if st.session_state.page_num < total_pages:
+                    st.session_state.page_num += 1
+                    st.rerun()
 
         # ----- Summary table (your existing code, with one small fix) -----
         # Sales in the entered zip code (normalized to string)
@@ -208,13 +231,14 @@ if "selected_agents" in st.session_state:
         st.dataframe(tbl, use_container_width=True)
 
     # ---------- Tab 2: Multi-dimension view ----------
-    with tab_dims:
+    elif st.session_state.active_tab == "📐 Multi-dimension view":
         st.subheader("📐 Agent rating by dimension")
-
-        # let the user pick an agent to visualize
+    
         agent_to_view = st.selectbox(
             "Choose an agent",
-            options=selected_agents["ListAgentFullName"].tolist()
+            options=selected_agents["ListAgentFullName"].tolist(),
+            key="agent_to_view",
+            on_change=focus_dims,  # <-- keep focus on this tab after change
         )
         row = selected_agents.loc[selected_agents["ListAgentFullName"] == agent_to_view].iloc[0]
 
