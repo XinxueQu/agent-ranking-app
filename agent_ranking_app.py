@@ -253,11 +253,11 @@ elif st.session_state.active_tab == "📐 Multi-dimension view":
 
     row = selected_agents.loc[selected_agents["ListAgentFullName"] == agent_to_view].iloc[0]
 
-    # Build dims safely (NOTE: correct column name 'median_dayson_mkt_score')
+    # Build dims safely (NOTE: correct column name 'median_days_on_mkt_score')
     dims = {
         "Volume": row.get("volume_score", np.nan),
         "Close Rate": row.get("close_rate_score", np.nan),
-        "Days on Market (↓)": row.get("median_dayson_mkt_score", np.nan),
+        "Days on Market (↓)": row.get("median_days_on_mkt_score", np.nan),
         "Pricing Accuracy": row.get("pricing_accuracy_score", np.nan),
     }
     if "sales_score" in row.index:
