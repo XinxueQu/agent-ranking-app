@@ -259,9 +259,10 @@ elif st.session_state.active_tab == "📐 Multi-dimension view":
         "Close Rate": row.get("close_rate_score", np.nan),
         "Days on Market (↓)": row.get("median_days_on_mkt_score", np.nan),
         "Pricing Accuracy": row.get("pricing_accuracy_score", np.nan),
+        "Total Sales": row.get("sales_score", np.nan)
     }
-    if "sales_score" in row.index:
-        dims["Total Sales"] = row["sales_score"]
+    #if "sales_score" in row.index:
+    #    dims["Total Sales"] = row["sales_score"]
 
     dim_df = pd.DataFrame({"Dimension": list(dims.keys()), "Score": list(dims.values())}).dropna()
 
