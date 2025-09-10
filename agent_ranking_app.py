@@ -16,6 +16,21 @@ def focus_rankings():
     st.session_state.active_tab = "🏆 Rankings"
 
 
+# --- Normalize dimension scores to 0–100 across the currently filtered agents ---
+def get_norm(col: str, invert: bool = False) -> float:
+    """Min–max normalize the selected agent's value to [0,100].
+       If invert=True, lower raw values map to higher normalized scores."""
+    if col not in selected_agents.columns:
+        return np.nan
+    s = pd.to_numeric(selected_agents[col], errors="coerce")
+    x = pd.to_numeric(row.get(col, np.nan), errors="coerce")
+    vmin, vmax = np.nanmin(s.values), np.nanmax(s.values)
+    if np.isnan(x) or np.isnan(vmin) or np.isnan(vmax) or vmax == vmin:
+        return np.nan
+    val = (x - vmin) / (vmax - vmin)
+    if invert:
+        val = 1.0 - val
+    return float(np.clip(val * 100.0, 0, 100))
 
 
 st.set_page_config(page_title="Agent Rankings", layout="wide")
@@ -280,21 +295,7 @@ elif st.session_state.active_tab == "📐 Multi-dimension view":
     row = selected_agents.loc[selected_agents["ListAgentFullName"] == agent_to_view].iloc[0]
 
     
-    # --- Normalize dimension scores to 0–100 across the currently filtered agents ---
-    def get_norm(col: str, invert: bool = False) -> float:
-        """Min–max normalize the selected agent's value to [0,100].
-           If invert=True, lower raw values map to higher normalized scores."""
-        if col not in selected_agents.columns:
-            return np.nan
-        s = pd.to_numeric(selected_agents[col], errors="coerce")
-        x = pd.to_numeric(row.get(col, np.nan), errors="coerce")
-        vmin, vmax = np.nanmin(s.values), np.nanmax(s.values)
-        if np.isnan(x) or np.isnan(vmin) or np.isnan(vmax) or vmax == vmin:
-            return np.nan
-        val = (x - vmin) / (vmax - vmin)
-        if invert:
-            val = 1.0 - val
-        return float(np.clip(val * 100.0, 0, 100))
+
     
     # Build normalized dimension dict (Days on Market is better when LOWER -> invert=True)
     dims = {
