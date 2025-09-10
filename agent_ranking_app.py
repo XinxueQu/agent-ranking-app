@@ -182,18 +182,44 @@ if st.session_state.active_tab == "🏆 Rankings":
     if num_agents == 0:
         st.warning("No agents matched your filters. Adjust filters and re-run.")
     else:
-        st.dataframe(paged_agents, use_container_width=True, height=420)
-        st.caption(f"Showing page {st.session_state.page_num} of {total_pages} ({num_agents} agents found)")
+        # ----- Build a summary-style table for the FIRST display (same schema as Table 2) -----
+        if 'zipcode' in locals() and zipcode:
+            z_str = str(zipcode).strip()
+            sales_in_zip_first = (
+                df_filtered[df_filtered['PostalCode'].astype(str).str.strip() == z_str]
+                .groupby('ListAgentFullName', dropna=False)['ClosePrice']
+                .sum()
+                .rename('Sales_In_Zip')
+                .reset_index()
+            )
+        else:
+            sales_in_zip_first = selected_agents[['ListAgentFullName']].assign(Sales_In_Zip=np.nan)
 
-        col1, _, col3 = st.columns([1, 2, 1])
-        with col1:
-            if st.button("⬅️ Previous") and st.session_state.page_num > 1:
-                st.session_state.page_num -= 1
-                st.rerun()
-        with col3:
-            if st.button("Next ➡️") and st.session_state.page_num < total_pages:
-                st.session_state.page_num += 1
-                st.rerun()
+        tbl_first = selected_agents.merge(sales_in_zip_first, on='ListAgentFullName', how='left')
+        tbl_first['%_Sales_in_Zip'] = (tbl_first['Sales_In_Zip'] / tbl_first['total_sales']).replace([np.inf, -np.inf], np.nan)
+
+        # Ranks (same definitions as second table)
+        tbl_first['Rank']                  = tbl_first['overall_score'].rank(ascending=False, method='dense').astype(int)
+        tbl_first['Close Rate Rank']       = tbl_first['close_rate'].rank(ascending=False, method='dense').astype(int)
+        tbl_first['Days on Market Rank']   = tbl_first['closed_daysonmarket_median'].rank(ascending=True,  method='dense').astype(int)
+        tbl_first['Pricing Accuracy Rank'] = tbl_first['avg_pricing_accuracy'].rank(ascending=False, method='dense').astype(int)
+        tbl_first['Total Sales Rank']      = tbl_first['total_sales'].rank(ascending=False, method='dense').astype(int)
+        tbl_first['Closed Count Rank']     = tbl_first['closed_count'].rank(ascending=False, method='dense').astype(int)
+
+        final_cols_first = [
+            'Rank', 'ListAgentFullName', 'overall_score',
+            'total_sales', 'Total Sales Rank',
+            'closed_count', 'Closed Count Rank',
+            '%_Sales_in_Zip',
+            'close_rate', 'Close Rate Rank',
+            'closed_daysonmarket_median', 'Days on Market Rank',
+            'avg_pricing_accuracy', 'Pricing Accuracy Rank'
+        ]
+
+        tbl_first = tbl_first[final_cols_first].sort_values(['Rank', 'overall_score'], ascending=[True, False]).reset_index(drop=True)
+
+        st.subheader("📋 Top Ranked Agents (Summary View)")
+        st.dataframe(tbl_first, use_container_width=True)
 
         # ----- Summary table -----
         if 'zipcode' in locals() and zipcode:
