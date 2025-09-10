@@ -16,7 +16,7 @@ def focus_rankings():
     st.session_state.active_tab = "🏆 Rankings"
 
 
-# --- Normalize dimension scores to 0–100 across the currently filtered agents ---
+# Put this helper above the code block (once in your app)
 def get_norm(col: str, invert: bool = False) -> float:
     """Min–max normalize the selected agent's value to [0,100].
        If invert=True, lower raw values map to higher normalized scores."""
@@ -25,12 +25,17 @@ def get_norm(col: str, invert: bool = False) -> float:
     s = pd.to_numeric(selected_agents[col], errors="coerce")
     x = pd.to_numeric(row.get(col, np.nan), errors="coerce")
     vmin, vmax = np.nanmin(s.values), np.nanmax(s.values)
-    if np.isnan(x) or np.isnan(vmin) or np.isnan(vmax) or vmax == vmin:
+    # Handle degenerate cases: all equal or missing
+    if np.isnan(x) or np.isnan(vmin) or np.isnan(vmax):
         return np.nan
+    if vmax == vmin:
+        # Neutral score so charts still render (adjust if you prefer 100)
+        return 50.0
     val = (x - vmin) / (vmax - vmin)
     if invert:
         val = 1.0 - val
     return float(np.clip(val * 100.0, 0, 100))
+
 
 
 st.set_page_config(page_title="Agent Rankings", layout="wide")
@@ -296,24 +301,15 @@ elif st.session_state.active_tab == "📐 Multi-dimension view":
 
     
 
-    
-    # Build normalized dimension dict (Days on Market is better when LOWER -> invert=True)
+    # Build normalized dimensions directly; don't rely on row[...] for *_norm columns
     dims = {
-        "volume_score_norm":             get_norm("volume_score"),
-        "close_rate_score_norm":         get_norm("close_rate_score"),
-        "median_days_on_mkt_score_norm": get_norm("median_days_on_mkt_score", invert=True),
-        "Pricing Accuracy":   get_norm("pricing_accuracy_score"),
-        "sales_score_norm":        get_norm("sales_score"),
+        "Volume":             get_norm("volume_score"),
+        "Close Rate":         get_norm("close_rate_score"),
+        "Days on Market":     get_norm("median_days_on_mkt_score", invert=True),
+        "Pricing Accuracy":   row.get("pricing_accuracy_score", np.nan), #get_norm("pricing_accuracy_score"),
+        "Total Sales":        get_norm("sales_score"),
     }
 
-    # Build dims safely (NOTE: correct column name 'median_days_on_mkt_score')
-    dims = {
-        "Volume": row.get("volume_score_norm", np.nan),
-        "Close Rate": row.get("close_rate_score_norm", np.nan),
-        "Days on Market (↓)": row.get("median_days_on_mkt_score_norm", np.nan),
-        "Pricing Accuracy": row.get("pricing_accuracy_score", np.nan),
-        "Total Sales": row.get("sales_score_norm", np.nan)
-    }
 
     
 
