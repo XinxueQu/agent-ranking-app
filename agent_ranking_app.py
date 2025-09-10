@@ -299,20 +299,20 @@ elif st.session_state.active_tab == "📐 Multi-dimension view":
     
     # Build normalized dimension dict (Days on Market is better when LOWER -> invert=True)
     dims = {
-        "Volume":             get_norm("volume_score"),
-        "Close Rate":         get_norm("close_rate_score"),
-        "Days on Market (↓)": get_norm("median_days_on_mkt_score", invert=True),
+        "volume_score_norm":             get_norm("volume_score"),
+        "close_rate_score_norm":         get_norm("close_rate_score"),
+        "median_days_on_mkt_score_norm": get_norm("median_days_on_mkt_score", invert=True),
         "Pricing Accuracy":   get_norm("pricing_accuracy_score"),
-        "Total Sales":        get_norm("sales_score"),
+        "sales_score_norm":        get_norm("sales_score"),
     }
 
     # Build dims safely (NOTE: correct column name 'median_days_on_mkt_score')
     dims = {
-        "Volume": row.get("volume_score", np.nan),
-        "Close Rate": row.get("close_rate_score", np.nan),
-        "Days on Market (↓)": row.get("median_days_on_mkt_score", np.nan),
+        "Volume": row.get("volume_score_norm", np.nan),
+        "Close Rate": row.get("close_rate_score_norm", np.nan),
+        "Days on Market (↓)": row.get("median_days_on_mkt_score_norm", np.nan),
         "Pricing Accuracy": row.get("pricing_accuracy_score", np.nan),
-        "Total Sales": row.get("sales_score", np.nan)
+        "Total Sales": row.get("sales_score_norm", np.nan)
     }
 
     
