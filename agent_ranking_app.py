@@ -279,15 +279,7 @@ elif st.session_state.active_tab == "📐 Multi-dimension view":
 
     row = selected_agents.loc[selected_agents["ListAgentFullName"] == agent_to_view].iloc[0]
 
-    # Build dims safely (NOTE: correct column name 'median_days_on_mkt_score')
-    dims = {
-        "Volume": row.get("volume_score", np.nan),
-        "Close Rate": row.get("close_rate_score", np.nan),
-        "Days on Market (↓)": row.get("median_days_on_mkt_score", np.nan),
-        "Pricing Accuracy": row.get("pricing_accuracy_score", np.nan),
-        "Total Sales": row.get("sales_score", np.nan)
-    }
-
+    
     # --- Normalize dimension scores to 0–100 across the currently filtered agents ---
     def get_norm(col: str, invert: bool = False) -> float:
         """Min–max normalize the selected agent's value to [0,100].
@@ -312,6 +304,16 @@ elif st.session_state.active_tab == "📐 Multi-dimension view":
         "Pricing Accuracy":   get_norm("pricing_accuracy_score"),
         "Total Sales":        get_norm("sales_score"),
     }
+
+    # Build dims safely (NOTE: correct column name 'median_days_on_mkt_score')
+    dims = {
+        "Volume": row.get("volume_score", np.nan),
+        "Close Rate": row.get("close_rate_score", np.nan),
+        "Days on Market (↓)": row.get("median_days_on_mkt_score", np.nan),
+        "Pricing Accuracy": row.get("pricing_accuracy_score", np.nan),
+        "Total Sales": row.get("sales_score", np.nan)
+    }
+
     
 
     #if "sales_score" in row.index:
