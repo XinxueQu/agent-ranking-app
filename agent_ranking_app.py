@@ -287,6 +287,33 @@ elif st.session_state.active_tab == "📐 Multi-dimension view":
         "Pricing Accuracy": row.get("pricing_accuracy_score", np.nan),
         "Total Sales": row.get("sales_score", np.nan)
     }
+
+    # --- Normalize dimension scores to 0–100 across the currently filtered agents ---
+    def get_norm(col: str, invert: bool = False) -> float:
+        """Min–max normalize the selected agent's value to [0,100].
+           If invert=True, lower raw values map to higher normalized scores."""
+        if col not in selected_agents.columns:
+            return np.nan
+        s = pd.to_numeric(selected_agents[col], errors="coerce")
+        x = pd.to_numeric(row.get(col, np.nan), errors="coerce")
+        vmin, vmax = np.nanmin(s.values), np.nanmax(s.values)
+        if np.isnan(x) or np.isnan(vmin) or np.isnan(vmax) or vmax == vmin:
+            return np.nan
+        val = (x - vmin) / (vmax - vmin)
+        if invert:
+            val = 1.0 - val
+        return float(np.clip(val * 100.0, 0, 100))
+    
+    # Build normalized dimension dict (Days on Market is better when LOWER -> invert=True)
+    dims = {
+        "Volume":             get_norm("volume_score"),
+        "Close Rate":         get_norm("close_rate_score"),
+        "Days on Market (↓)": get_norm("median_days_on_mkt_score", invert=True),
+        "Pricing Accuracy":   get_norm("pricing_accuracy_score"),
+        "Total Sales":        get_norm("sales_score"),
+    }
+    
+
     #if "sales_score" in row.index:
     #    dims["Total Sales"] = row["sales_score"]
 
