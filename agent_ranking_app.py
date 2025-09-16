@@ -321,8 +321,8 @@ elif st.session_state.active_tab == "📐 Multi-dimension view":
     # Preserve prior selection if still valid
     default_index = 0
     prev = st.session_state.get("agent_to_view")
-    if prev in options:
-        default_index = options.index(prev)
+    if prev in options_custom:
+        default_index = options_custom.index(prev)
 
     # Select agent; keep focus on this view after change
     agent_to_view = st.selectbox(
