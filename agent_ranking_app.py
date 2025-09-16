@@ -298,23 +298,36 @@ if st.session_state.active_tab == "🏆 Rankings":
 # ---------- Tab 2: Multi-dimension view ----------
 elif st.session_state.active_tab == "📐 Multi-dimension view":
     st.subheader("📐 Agent rating by dimension")
-    
+           
+    if num_agents == 0:
+        st.warning("No agents matched your filters. Adjust filters and re-run.")
+        st.stop()
+
     # Pull tbl from session state (it was set in the Rankings tab)
     tb = st.session_state.get("tbl")
     if tb is None or tb.empty or "ListAgentFullName" not in tb.columns:
         st.warning("No summary table available yet. Run Rankings first.")
         st.stop()
-        
-    if num_agents == 0:
-        st.warning("No agents matched your filters. Adjust filters and re-run.")
+
+    # Build stable, overlapping options (Series -> str -> dropna -> set -> sorted list)
+    left = set(selected_agents["ListAgentFullName"].dropna().astype(str))
+    right = set(tb["ListAgentFullName"].dropna().astype(str))
+    options_custom = sorted(left & right)
+
+    if not options:
+        st.warning("No overlapping agents between the current selection and the summary table.")
         st.stop()
+
+    # Preserve prior selection if still valid
+    default_index = 0
+    prev = st.session_state.get("agent_to_view")
+    if prev in options:
+        default_index = options.index(prev)
 
     # Select agent; keep focus on this view after change
     agent_to_view = st.selectbox(
         "Choose an agent",
-        options=sorted(set(selected_agents["ListAgentFullName"]) &
-                 set(tbl["ListAgentFullName"])
-                ),  #selected_agents["ListAgentFullName"].tolist(),
+        options=options_custom,  #selected_agents["ListAgentFullName"].tolist(),
         key="agent_to_view",
         on_change=focus_dims,
     )
