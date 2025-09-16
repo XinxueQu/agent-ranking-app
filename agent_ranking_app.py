@@ -298,7 +298,13 @@ if st.session_state.active_tab == "🏆 Rankings":
 # ---------- Tab 2: Multi-dimension view ----------
 elif st.session_state.active_tab == "📐 Multi-dimension view":
     st.subheader("📐 Agent rating by dimension")
-
+    
+    # Pull tbl from session state (it was set in the Rankings tab)
+    tb = st.session_state.get("tbl")
+    if tb is None or tb.empty or "ListAgentFullName" not in tb.columns:
+        st.warning("No summary table available yet. Run Rankings first.")
+        st.stop()
+        
     if num_agents == 0:
         st.warning("No agents matched your filters. Adjust filters and re-run.")
         st.stop()
