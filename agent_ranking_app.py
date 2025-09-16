@@ -300,7 +300,9 @@ elif st.session_state.active_tab == "📐 Multi-dimension view":
     # Select agent; keep focus on this view after change
     agent_to_view = st.selectbox(
         "Choose an agent",
-        options=selected_agents["ListAgentFullName"].tolist(),
+        options=(set(selected_agents["ListAgentFullName"]) &
+                 set(tbl["ListAgentFullName"])
+                ),  #selected_agents["ListAgentFullName"].tolist(),
         key="agent_to_view",
         on_change=focus_dims,
     )
@@ -309,9 +311,6 @@ elif st.session_state.active_tab == "📐 Multi-dimension view":
         st.info("Pick an agent to render charts.")
         st.stop()
 
-
-    selected_agents['%_Sales_in_Zip'] = (selected_agents['Sales_In_Zip'] / selected_agents['total_sales']).replace([np.inf, -np.inf], np.nan)
-    selected_agents = selected_agents[tbl['%_Sales_in_Zip']>=min_sales_pct]
     row = selected_agents.loc[selected_agents["ListAgentFullName"] == agent_to_view].iloc[0]
 
     # Build normalized dimensions directly; don't rely on row[...] for *_norm columns
