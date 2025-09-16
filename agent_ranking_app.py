@@ -300,7 +300,7 @@ elif st.session_state.active_tab == "📐 Multi-dimension view":
     # Select agent; keep focus on this view after change
     agent_to_view = st.selectbox(
         "Choose an agent",
-        options=(set(selected_agents["ListAgentFullName"]) &
+        options=sorted(set(selected_agents["ListAgentFullName"]) &
                  set(tbl["ListAgentFullName"])
                 ),  #selected_agents["ListAgentFullName"].tolist(),
         key="agent_to_view",
@@ -322,8 +322,6 @@ elif st.session_state.active_tab == "📐 Multi-dimension view":
         "Total Sales":        get_norm("sales_score"),
     }
 
-
-    
 
     #if "sales_score" in row.index:
     #    dims["Total Sales"] = row["sales_score"]
