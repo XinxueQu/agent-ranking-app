@@ -305,8 +305,8 @@ elif st.session_state.active_tab == "📐 Multi-dimension view":
     dims = {
         "Volume":             get_norm("volume_score"),
         "Close Rate":         get_norm("close_rate_score"),
-        "Days on Market":     get_norm("median_days_on_mkt_score", invert=True),
-        "Pricing Accuracy":   row.get("pricing_accuracy_score", np.nan), #get_norm("pricing_accuracy_score"),
+        "Days on Market":     get_norm("closed_daysonmarket_median", invert=True),
+        #"Pricing Accuracy":   row.get("pricing_accuracy_score", np.nan), #get_norm("pricing_accuracy_score"),
         "Total Sales":        get_norm("sales_score"),
     }
 
