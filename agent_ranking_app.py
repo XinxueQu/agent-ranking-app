@@ -96,13 +96,13 @@ with st.form("filters_and_weights"):
         subdivision = st.text_input("Subdivision")
         min_volume = st.number_input("Minimum Total Transactions", value=0)
         min_sales_pct = st.slider(
-        "Min % Sales in Selected ZipCode",
-        min_value=0,
-        max_value=100,
-        value=0,
-        step=1,
-        format="%d%%"
-        )
+            "Min % Sales in Selected ZipCode",
+            min_value=0,
+            max_value=100,
+            value=0,
+            step=1,
+            format="%d%%"
+            )
 
     with right_col:
         st.subheader("⚖️ Scoring Weights")
@@ -164,6 +164,7 @@ if submitted:
     first = ['ListAgentFullName', 'overall_score']
     rest = [c for c in selected_agents.columns if c not in first]
     selected_agents = selected_agents.loc[:, first + rest]
+    
 
     # Save for paging/render after the form
     st.session_state.selected_agents = selected_agents
@@ -225,6 +226,8 @@ if st.session_state.active_tab == "🏆 Rankings":
 
         tbl_first = selected_agents.merge(sales_in_zip_first, on='ListAgentFullName', how='left')
         tbl_first['%_Sales_in_Zip'] = (tbl_first['Sales_In_Zip'] / tbl_first['total_sales']).replace([np.inf, -np.inf], np.nan)
+        tbl_first = tbl_first[tbl_first['%_Sales_in_Zip']>=min_sales_pct]
+
 
         # Ranks (same definitions as second table)
         tbl_first['Rank']                  = tbl_first['overall_score'].rank(ascending=False, method='dense').astype(int)
@@ -264,6 +267,7 @@ if st.session_state.active_tab == "🏆 Rankings":
 
         tbl = selected_agents.merge(sales_in_zip, on='ListAgentFullName', how='left')
         tbl['%_Sales_in_Zip'] = (tbl['Sales_In_Zip'] / tbl['total_sales']).replace([np.inf, -np.inf], np.nan)
+        tbl = tbl[tbl['%_Sales_in_Zip']>=min_sales_pct]
 
         tbl['Rank']                = tbl['overall_score'].rank(ascending=False, method='dense').astype(int)
         tbl['Close Rate Rank']     = tbl['close_rate'].rank(ascending=False, method='dense').astype(int)
@@ -305,9 +309,10 @@ elif st.session_state.active_tab == "📐 Multi-dimension view":
         st.info("Pick an agent to render charts.")
         st.stop()
 
-    row = selected_agents.loc[selected_agents["ListAgentFullName"] == agent_to_view].iloc[0]
 
-    
+    selected_agents['%_Sales_in_Zip'] = (selected_agents['Sales_In_Zip'] / selected_agents['total_sales']).replace([np.inf, -np.inf], np.nan)
+    selected_agents = selected_agents[tbl['%_Sales_in_Zip']>=min_sales_pct]
+    row = selected_agents.loc[selected_agents["ListAgentFullName"] == agent_to_view].iloc[0]
 
     # Build normalized dimensions directly; don't rely on row[...] for *_norm columns
     dims = {
