@@ -286,6 +286,12 @@ if st.session_state.active_tab == "🏆 Rankings":
             'avg_pricing_accuracy', 'Pricing Accuracy Rank'
         ]
         tbl = tbl[final_cols].sort_values(['Rank', 'overall_score'])
+
+        if "tbl" not in st.session_state:
+            st.session_state.tbl = tbl.copy()
+        else:
+            st.session_state.tbl = tbl.copy()
+            
         st.subheader("📊 Summary by Agent (Filtered)")
         st.dataframe(tbl, use_container_width=True)
 
