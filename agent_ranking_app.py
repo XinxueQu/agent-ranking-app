@@ -102,7 +102,7 @@ with st.form("filters_and_weights"):
             value=0,
             step=1,
             format="%d%%"
-            )
+            )/100
 
     with right_col:
         st.subheader("⚖️ Scoring Weights")
