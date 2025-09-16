@@ -314,7 +314,7 @@ elif st.session_state.active_tab == "📐 Multi-dimension view":
     right = set(tb["ListAgentFullName"].dropna().astype(str))
     options_custom = sorted(left & right)
 
-    if not options:
+    if not options_custom:
         st.warning("No overlapping agents between the current selection and the summary table.")
         st.stop()
 
