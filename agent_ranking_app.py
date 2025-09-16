@@ -95,13 +95,21 @@ with st.form("filters_and_weights"):
         elementary = st.text_input("Elementary School")
         subdivision = st.text_input("Subdivision")
         min_volume = st.number_input("Minimum Total Transactions", value=0)
+        min_sales_pct = st.slider(
+        "Min % Sales in Selected ZipCode",
+        min_value=0,
+        max_value=100,
+        value=0,
+        step=1,
+        format="%d%%"
+        )
 
     with right_col:
         st.subheader("⚖️ Scoring Weights")
-        weight_volumne = st.number_input("Transaction Volume", value=0.4, key="w_vol")
+        weight_volumne = st.number_input("Transaction Volume", value=0.5, key="w_vol")
         weight_close   = st.number_input("Close Rate",            value=0.3, key="w_close")
         weight_days    = st.number_input("Days on Market",        value=0.2, key="w_days")
-        weight_price   = st.number_input("Pricing Accuracy",      value=0.1, key="w_price")
+        weight_price   = st.number_input("Pricing Accuracy",      value=0, key="w_price")
 
     submitted = st.form_submit_button("Run Rankings")
 
