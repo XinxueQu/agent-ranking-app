@@ -95,14 +95,30 @@ with st.form("filters_and_weights"):
         elementary = st.text_input("Elementary School")
         subdivision = st.text_input("Subdivision")
         min_volume = st.number_input("Minimum Total Transactions", value=0)
-        min_sales_pct = st.slider(
-            "Min % Sales in Selected ZipCode",
-            min_value=0,
-            max_value=100,
-            value=0,
-            step=1,
-            format="%d%%"
-            )/100
+        
+        #min_sales_pct = st.slider(
+        #    "Min % Sales in Selected ZipCode",
+        #    min_value=0,   max_value=100,  value=0, step=1,
+        #    format="%d%%" )/100
+
+        # Text input box (shown as percentage for user convenience)
+        default_sales_pct = 10
+        min_sales_pct = st.text_input(
+            "Min % Sales in Selected ZipCode (0–100%)",
+            value=str(default_sales_pct)
+        )
+        
+        # Convert input to float safely
+        try:
+            min_sales_pct = float(min_sales_pct)
+            # Validate range
+            if not (0 <= min_sales_pct <= 100):
+                st.warning("Value must be between 0 and 100%. Resetting to default (10%).")
+                min_sales_pct = default_sales_pct
+        except ValueError:
+            st.warning("Invalid input. Resetting to default (0.1).")
+            min_sales_pct = default_sales_pct
+        min_sales_pct = min_sales_pct/100
 
     with right_col:
         st.subheader("⚖️ Scoring Weights")
