@@ -89,7 +89,10 @@ with st.form("filters_and_weights"):
 
     with left_col:
         st.subheader("📍 Filter Listings")
-        zipcode = st.text_input("Zipcode")
+        #zipcode = st.text_input("Zipcode")
+        # NEW:
+        zip_options = sorted(data["PostalCode"].dropna().astype(str).unique())
+        zipcodes = st.multiselect("Zipcode(s)", options=zip_options)
         min_price = st.number_input("Minimum Price", value=0)
         max_price = st.number_input("Maximum Price", value=1_000_000)
         elementary = st.text_input("Elementary School")
@@ -153,8 +156,13 @@ if submitted:
 
     # --- Filtering ---
     df_filtered = data.copy()
-    if zipcode and pd.notna(zipcode) and zipcode in df_filtered['PostalCode'].dropna().unique():
-        df_filtered = df_filtered[df_filtered['PostalCode'] == zipcode]
+    # one zipcode
+    #if zipcode and pd.notna(zipcode) and zipcode in df_filtered['PostalCode'].dropna().unique():
+    #    df_filtered = df_filtered[df_filtered['PostalCode'] == zipcode]
+    # NEW: multiple zipcodes
+    if zipcodes:
+        z_set = {str(z).strip() for z in zipcodes}
+        df_filtered = df_filtered[df_filtered["PostalCode"].astype(str).str.strip().isin(z_set)]
     # Normalize to string for safe comparison
     if zipcode:
         z = str(zipcode).strip()
