@@ -159,6 +159,9 @@ if submitted:
     # one zipcode
     #if zipcode and pd.notna(zipcode) and zipcode in df_filtered['PostalCode'].dropna().unique():
     #    df_filtered = df_filtered[df_filtered['PostalCode'] == zipcode]
+    #if zipcode:
+    #    z = str(zipcode).strip()
+    #    df_filtered = df_filtered[df_filtered['PostalCode'].astype(str).str.strip() == z]
     # NEW: multiple zipcodes
     if zipcodes:
         z_set = {str(z).strip() for z in zipcodes}
@@ -236,17 +239,25 @@ if st.session_state.active_tab == "🏆 Rankings":
         st.warning("No agents matched your filters. Adjust filters and re-run.")
     else:
         # ----- Build a summary-style table for the FIRST display (same schema as Table 2) -----
-        if 'zipcode' in locals() and zipcode:
-            z_str = str(zipcode).strip()
-            sales_in_zip_first = (
-                df_filtered[df_filtered['PostalCode'].astype(str).str.strip() == z_str]
-                .groupby('ListAgentFullName', dropna=False)['ClosePrice']
-                .sum()
-                .rename('Sales_In_Zip')
-                .reset_index()
-            )
-        else:
-            sales_in_zip_first = selected_agents[['ListAgentFullName']].assign(Sales_In_Zip=np.nan)
+        # NEW:
+        sales_in_zip_first = (
+            df_filtered.groupby('ListAgentFullName', dropna=False)['ClosePrice']
+            .sum()
+            .rename('Sales_In_Zip')
+            .reset_index()
+        )
+        # OLD Block
+        #if 'zipcode' in locals() and zipcode:
+        #    z_str = str(zipcode).strip()
+        #    sales_in_zip_first = (
+        #        df_filtered[df_filtered['PostalCode'].astype(str).str.strip() == z_str]
+        #        .groupby('ListAgentFullName', dropna=False)['ClosePrice']
+        #        .sum()
+        #        .rename('Sales_In_Zip')
+        #        .reset_index()
+        #    )
+        #else:
+        #    sales_in_zip_first = selected_agents[['ListAgentFullName']].assign(Sales_In_Zip=np.nan)
 
         tbl_first = selected_agents.merge(sales_in_zip_first, on='ListAgentFullName', how='left')
         tbl_first['%_Sales_in_Zip'] = (tbl_first['Sales_In_Zip'] / tbl_first['total_sales']).replace([np.inf, -np.inf], np.nan)
@@ -277,17 +288,26 @@ if st.session_state.active_tab == "🏆 Rankings":
         st.dataframe(tbl_first, use_container_width=True)
 
         # ----- Summary table -----
-        if 'zipcode' in locals() and zipcode:
-            z_str = str(zipcode).strip()
-            sales_in_zip = (
-                df_filtered[df_filtered['PostalCode'].astype(str).str.strip() == z_str]
-                .groupby('ListAgentFullName', dropna=False)['ClosePrice']
-                .sum()
-                .rename('Sales_In_Zip')
-                .reset_index()
-            )
-        else:
-            sales_in_zip = selected_agents[['ListAgentFullName']].assign(Sales_In_Zip=np.nan)
+        #NEW: 
+        # NEW:
+        sales_in_zip = (
+            df_filtered.groupby('ListAgentFullName', dropna=False)['ClosePrice']
+            .sum()
+            .rename('Sales_In_Zip')
+            .reset_index()
+        )
+        # OLD Block
+        #if 'zipcode' in locals() and zipcode:
+        #    z_str = str(zipcode).strip()
+        #    sales_in_zip = (
+        #        df_filtered[df_filtered['PostalCode'].astype(str).str.strip() == z_str]
+        #        .groupby('ListAgentFullName', dropna=False)['ClosePrice']
+        #        .sum()
+        #        .rename('Sales_In_Zip')
+        #        .reset_index()
+        #    )
+        #else:
+        #    sales_in_zip = selected_agents[['ListAgentFullName']].assign(Sales_In_Zip=np.nan)
 
         tbl = selected_agents.merge(sales_in_zip, on='ListAgentFullName', how='left')
         tbl['%_Sales_in_Zip'] = (tbl['Sales_In_Zip'] / tbl['total_sales']).replace([np.inf, -np.inf], np.nan)
