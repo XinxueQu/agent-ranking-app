@@ -162,14 +162,15 @@ if submitted:
     #if zipcode:
     #    z = str(zipcode).strip()
     #    df_filtered = df_filtered[df_filtered['PostalCode'].astype(str).str.strip() == z]
+    #if zipcode:
+    #    z = str(zipcode).strip()
+    #    df_filtered = df_filtered[df_filtered['PostalCode'].astype(str).str.strip() == z]
     # NEW: multiple zipcodes
     if zipcodes:
         z_set = {str(z).strip() for z in zipcodes}
         df_filtered = df_filtered[df_filtered["PostalCode"].astype(str).str.strip().isin(z_set)]
     # Normalize to string for safe comparison
-    if zipcode:
-        z = str(zipcode).strip()
-        df_filtered = df_filtered[df_filtered['PostalCode'].astype(str).str.strip() == z]
+    
     df_filtered = df_filtered[df_filtered['ClosePrice'] >= min_price]
     df_filtered = df_filtered[df_filtered['ClosePrice'] <= max_price]
     if elementary and pd.notna(elementary) and elementary in df_filtered['ElementarySchool'].dropna().unique():
