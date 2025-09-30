@@ -200,7 +200,8 @@ if submitted:
                on="ListAgentFullName", how="left")
         .sort_values(by='overall_score', ascending=False)
     )
-    first = ['ListAgentFullName', 'overall_score']
+    first = ['ListAgentFullName', 'overall_score', 'Median_Close_Price']
+    
     rest = [c for c in selected_agents.columns if c not in first]
     selected_agents = selected_agents.loc[:, first + rest]
     
