@@ -288,6 +288,7 @@ if st.session_state.active_tab == "🏆 Rankings":
 
         final_cols_first = [
             'Rank', 'ListAgentFullName', 'overall_score',
+            'Median Close Price',              # ⬅️ ADD THIS
             'total_sales', 'Total Sales Rank',
             'closed_count', 'Closed Count Rank',
             '%_Sales_in_Zip',
@@ -337,6 +338,7 @@ if st.session_state.active_tab == "🏆 Rankings":
         final_cols = [
             'Rank', 'ListAgentFullName', 'overall_score',
             'total_sales', 'Total Sales Rank',
+            'Median Close Price',              # ⬅️ ADD THIS
             'closed_count', 'Closed Count Rank',
             '%_Sales_in_Zip',
             'close_rate', 'Close Rate Rank',
