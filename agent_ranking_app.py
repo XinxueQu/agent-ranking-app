@@ -183,6 +183,14 @@ if submitted:
         .size()
         .reset_index(name='n')
     )
+    
+    median_close = (
+        df_filtered.groupby('ListAgentFullName', dropna=False)['ClosePrice']
+        .median()
+        .reset_index(name='Median Close Price')
+    )
+    filtered_agent_counts = filtered_agent_counts.merge(median_close, on="ListAgentFullName", how="left")
+    
     filtered_agent_counts_selected = filtered_agent_counts[filtered_agent_counts['n'] >= min_volume]
 
     selected_agents = (
