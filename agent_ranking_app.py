@@ -193,8 +193,11 @@ if submitted:
     
     filtered_agent_counts_selected = filtered_agent_counts[filtered_agent_counts['n'] >= min_volume]
 
+    # ⬇️ Merge the median into selected_agents
     selected_agents = (
         scored[scored['ListAgentFullName'].isin(filtered_agent_counts_selected['ListAgentFullName'].unique())]
+        .merge(filtered_agent_counts_selected[['ListAgentFullName', 'Median Close Price']], 
+               on="ListAgentFullName", how="left")
         .sort_values(by='overall_score', ascending=False)
     )
     first = ['ListAgentFullName', 'overall_score']
