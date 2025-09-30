@@ -187,7 +187,7 @@ if submitted:
     median_close = (
         df_filtered.groupby('ListAgentFullName', dropna=False)['ClosePrice']
         .median()
-        .reset_index(name='Median Close Price')
+        .reset_index(name='Median_Close_Price')
     )
     filtered_agent_counts = filtered_agent_counts.merge(median_close, on="ListAgentFullName", how="left")
     
