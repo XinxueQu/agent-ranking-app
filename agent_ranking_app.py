@@ -189,9 +189,9 @@ if submitted:
         .reset_index(name='Median Close Price')   # nicer column name
     )
 
-    valid_agents = median_prices[
-        (median_prices['Median Close Price'] >= min_median_close) &
-        (median_prices['Median Close Price'] <= max_median_close)
+    valid_agents = median_close[
+        (median_close['Median Close Price'] >= min_median_close) &
+        (median_close['Median Close Price'] <= max_median_close)
     ]['ListAgentFullName'] 
     
     # keep only listings from agents whose median close price is in range
