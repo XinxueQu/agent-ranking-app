@@ -98,6 +98,10 @@ with st.form("filters_and_weights"):
         elementary = st.text_input("Elementary School")
         subdivision = st.text_input("Subdivision")
         min_volume = st.number_input("Minimum Total Transactions", value=0)
+
+        # NEW: Median Close Price range
+        min_median_close = st.number_input("Minimum Median Close Price", value=100_000)
+        max_median_close = st.number_input("Maximum Median Close Price", value=1_000_000)
         
         #min_sales_pct = st.slider(
         #    "Min % Sales in Selected ZipCode",
@@ -178,19 +182,29 @@ if submitted:
     if subdivision and pd.notna(subdivision) and subdivision in df_filtered['SubdivisionName'].dropna().unique():
         df_filtered = df_filtered[df_filtered['SubdivisionName'] == subdivision]
 
+
+    median_close = (
+        df_filtered.groupby('ListAgentFullName', dropna=False)['ClosePrice']
+        .median()
+        .reset_index(name='Median Close Price')   # nicer column name
+    )
+
+    valid_agents = median_prices[
+        (median_prices['Median Close Price'] >= min_median_close) &
+        (median_prices['Median Close Price'] <= max_median_close)
+    ]['ListAgentFullName'] 
+    
+    # keep only listings from agents whose median close price is in range
+    df_filtered = df_filtered[df_filtered['ListAgentFullName'].isin(valid_agents)]
+
+
     filtered_agent_counts = (
         df_filtered.groupby('ListAgentFullName', dropna=False)
         .size()
         .reset_index(name='n')
     )
     
-    
-    median_close = (
-        df_filtered.groupby('ListAgentFullName', dropna=False)['ClosePrice']
-        .median()
-        .reset_index(name='Median Close Price')   # nicer column name
-    )
-    
+
     filtered_agent_counts = filtered_agent_counts.merge(median_close, on="ListAgentFullName", how="left")
     filtered_agent_counts_selected = filtered_agent_counts[filtered_agent_counts['n'] >= min_volume]
     
