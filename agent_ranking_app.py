@@ -95,8 +95,8 @@ with st.form("filters_and_weights"):
         zipcodes = st.multiselect("Zipcode(s)", options=zip_options)
         min_price = st.number_input("Minimum Price", value=0)
         max_price = st.number_input("Maximum Price", value=1_000_000)
-        elementary = st.text_input("Elementary School")
-        subdivision = st.text_input("Subdivision")
+        #elementary = st.text_input("Elementary School")
+        #subdivision = st.text_input("Subdivision")
         min_volume = st.number_input("Minimum Total Transactions", value=0)
 
         # NEW: Median Close Price range
