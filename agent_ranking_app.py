@@ -15,6 +15,8 @@ def focus_dims():
 def focus_rankings():
     st.session_state.active_tab = "🏆 Rankings"
 
+def focus_alt():
+    st.session_state.active_tab = "🧪 Alternative Method"
 
 # Put this helper above the code block (once in your app)
 def get_norm(col: str, invert: bool = False) -> float:
@@ -451,5 +453,65 @@ elif st.session_state.active_tab == "📐 Multi-dimension view":
             selected_agents[selected_agents["ListAgentFullName"] == agent_to_view][["ListAgentFullName"] + cols_raw],
             use_container_width=True
         )
+
+    # ---------- Tab 3: Alternative Method ----------
+elif st.session_state.active_tab == "🧪 Alternative Method":
+    st.subheader("🧪 Alternative Filtering & Ranking Method")
+
+    if num_agents == 0:
+        st.warning("No agents matched your filters. Run Rankings first.")
+        st.stop()
+
+    st.markdown("""
+    This tab demonstrates a **new method** for filtering and ranking agents.
+    You can develop alternative scoring formulas or market-share based ranking here.
+    """)
+
+    # -------------------------
+    # Example: alternative scoring
+    # -------------------------
+    # Demonstration: simple geometric mean of four normalized fields
+    alt = selected_agents.copy()
+
+    # Prevent divide-by-zero issues
+    for c in ["volume_score", "close_rate_score", "median_dayson_mkt_score", "pricing_accuracy_score"]:
+        if c not in alt:
+            alt[c] = np.nan
+
+    alt["alt_score"] = (
+        (
+            alt["volume_score"].clip(lower=1) *
+            alt["close_rate_score"].clip(lower=1) *
+            alt["median_dayson_mkt_score"].clip(lower=1) *
+            alt["pricing_accuracy_score"].clip(lower=1)
+        ) ** 0.25
+    )
+
+    alt = alt.sort_values("alt_score", ascending=False)
+
+    st.subheader("📊 Alternative Ranking Table")
+    st.dataframe(
+        alt[[
+            "ListAgentFullName",
+            "alt_score",
+            "overall_score",
+            "volume_score",
+            "close_rate_score",
+            "median_dayson_mkt_score",
+            "pricing_accuracy_score",
+            "Median Close Price",
+            "total_sales"
+        ]],
+        use_container_width=True
+    )
+
+    # Optional: visualize
+    fig = px.bar(
+        alt.head(15),
+        x="ListAgentFullName",
+        y="alt_score",
+        title="Top 15 Agents - Alternative Score",
+    )
+    st.plotly_chart(fig, use_container_width=True)
 
 
