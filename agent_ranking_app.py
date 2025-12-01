@@ -234,9 +234,9 @@ if not submitted and "selected_agents" in st.session_state:
 # -- Always show the view selector so users can click the second view even before ranking --
 active_tab = st.radio(
     "View",
-    ["🏆 Rankings", "📐 Multi-dimension view"],
+    ["🏆 Rankings", "📐 Multi-dimension view", "🧪 Alternative Method"],
     horizontal=True,
-    index=0 if st.session_state.active_tab == "🏆 Rankings" else 1,
+    index=["🏆 Rankings", "📐 Multi-dimension view", "🧪 Alternative Method"].index(st.session_state.active_tab),
     key="active_tab",
 )
 
