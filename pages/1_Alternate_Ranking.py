@@ -1,20 +1,109 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import plotly.express as px
 
-st.set_page_config(page_title="Alternative Rankings", layout="wide")
+st.set_page_config(page_title="Alternate Ranking", layout="wide")
 
-st.title("🧪 Alternative Ranking Page")
+st.title("🧪 Alternate Ranking Page")
+st.write("This page lets you explore price distributions by zipcode and target a price range using ±1 standard deviation.")
 
-st.write("This is a completely separate Streamlit page.")
-
-# OPTIONAL — Load the same dataset as the main page
+# -------------------- Load Data --------------------
 @st.cache_data
 def load_data():
     url = "https://docs.google.com/spreadsheets/d/1UktHniggnt5YMQ_UA8IG9uo_L9PXbcIQ/export?format=csv"
-    return pd.read_csv(url)
+    usecols = [
+        "ListAgentFullName","is_closed","DaysOnMarket","pricing_accuracy",
+        "PostalCode","ClosePrice","ElementarySchool","SubdivisionName"
+    ]
+    return pd.read_csv(url, usecols=usecols)
 
-df = load_data()
+data = load_data()
 
-st.write("Sample of data:")
-st.dataframe(df.head())
+# -------------------- Filters --------------------
+st.subheader("📍 Choose Zipcodes")
+
+zip_options = sorted(data["PostalCode"].dropna().astype(str).unique())
+zipcodes = st.multiselect("Select Zipcode(s)", options=zip_options)
+
+if not zipcodes:
+    st.info("Please select at least one zipcode to proceed.")
+    st.stop()
+
+# Filter data
+filtered = data[data["PostalCode"].astype(str).isin(zipcodes)]
+
+if filtered.empty:
+    st.warning("No data found for selected zipcodes.")
+    st.stop()
+
+# -------------------- Visualize Close Price Distribution --------------------
+st.subheader("📊 Close Price Distribution")
+
+fig_hist = px.histogram(
+    filtered,
+    x="ClosePrice",
+    nbins=30,
+    title="Distribution of Close Prices",
+    labels={"ClosePrice": "Close Price"},
+)
+st.plotly_chart(fig_hist, use_container_width=True)
+
+# Optional boxplot for more insight
+with st.expander("Show Boxplot"):
+    fig_box = px.box(
+        filtered,
+        y="ClosePrice",
+        title="Close Price Boxplot"
+    )
+    st.plotly_chart(fig_box, use_container_width=True)
+
+# -------------------- Target Price + Std Dev --------------------
+st.subheader("🎯 Choose a Target Price")
+
+mean_price = filtered["ClosePrice"].mean()
+std_price = filtered["ClosePrice"].std()
+
+default_target = round(mean_price)
+
+target_price = st.number_input("Enter Target Close Price", value=int(default_target), step=1000)
+
+# Compute range ± 1 standard deviation
+lower_bound = target_price - std_price
+upper_bound = target_price + std_price
+
+st.markdown(f"""
+### 📌 Price Range (± 1 Standard Deviation)
+**Lower Bound:** ${lower_bound:,.0f}  
+**Upper Bound:** ${upper_bound:,.0f}  
+""")
+
+# Highlight this range on histogram
+fig_range = px.histogram(
+    filtered,
+    x="ClosePrice",
+    nbins=30,
+    title=f"Close Price Distribution with Target Range Highlighted",
+)
+
+fig_range.add_vrect(
+    x0=lower_bound,
+    x1=upper_bound,
+    fillcolor="green",
+    opacity=0.25,
+    line_width=0,
+)
+
+st.plotly_chart(fig_range, use_container_width=True)
+
+# -------------------- Show Listings Inside the Range --------------------
+st.subheader("📄 Listings Within Target Range")
+
+in_range = filtered[
+    (filtered["ClosePrice"] >= lower_bound) &
+    (filtered["ClosePrice"] <= upper_bound)
+]
+
+st.write(f"Found **{len(in_range)}** listings within ±1 SD of your target price.")
+
+st.dataframe(in_range, use_container_width=True)
