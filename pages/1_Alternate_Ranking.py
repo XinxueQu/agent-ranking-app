@@ -70,8 +70,8 @@ target_price = st.slider(
 )
 
 # Compute close price distribution
-sample_mean = df_zip["close_price"].mean()
-sample_std = df_zip["close_price"].std()
+sample_mean = filtered["close_price"].mean()
+sample_std = filtered["close_price"].std()
 
 # --- NEW: Allow user to adjust price range width ---
 st.subheader("📏 Price Range Width")
