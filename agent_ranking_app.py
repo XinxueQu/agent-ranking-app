@@ -16,6 +16,7 @@ def focus_rankings():
     st.session_state.active_tab = "🏆 Rankings"
 
 
+
 # Put this helper above the code block (once in your app)
 def get_norm(col: str, invert: bool = False) -> float:
     """Min–max normalize the selected agent's value to [0,100].
@@ -38,7 +39,11 @@ def get_norm(col: str, invert: bool = False) -> float:
 
 
 
-st.set_page_config(page_title="Agent Rankings", layout="wide")
+st.set_page_config(
+    page_title="Agent Rankings",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 st.markdown("<h1 style='text-align: center; color: darkblue;'>🏡 Top Real Estate Agent Rankings</h1>", unsafe_allow_html=True)
 
 # -------------------- Load data (CSV is faster) --------------------
