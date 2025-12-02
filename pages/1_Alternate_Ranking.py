@@ -59,18 +59,30 @@ with st.expander("Show Boxplot"):
     st.plotly_chart(fig_box, use_container_width=True)
 
 # -------------------- Target Price + Std Dev --------------------
-st.subheader("🎯 Choose a Target Price")
+# -------------------- Target Price + Std Dev --------------------
+st.subheader("🎯 Choose a Target Price (via slider)")
 
+min_price = int(filtered["ClosePrice"].min())
+max_price = int(filtered["ClosePrice"].max())
 mean_price = filtered["ClosePrice"].mean()
 std_price = filtered["ClosePrice"].std()
 
-default_target = round(mean_price)
+# Choose a reasonable step (e.g., $1,000)
+step_size = max(1000, int((max_price - min_price) / 200))
 
-target_price = st.number_input("Enter Target Close Price", value=int(default_target), step=1000)
+target_price = st.slider(
+    "Select Target Close Price",
+    min_value=min_price,
+    max_value=max_price,
+    value=int(mean_price),
+    step=step_size,
+    help="Select a target price. We will compute ±1 standard deviation around it."
+)
 
 # Compute range ± 1 standard deviation
 lower_bound = target_price - std_price
 upper_bound = target_price + std_price
+
 
 st.markdown(f"""
 ### 📌 Price Range (± 1 Standard Deviation)
