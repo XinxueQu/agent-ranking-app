@@ -94,17 +94,6 @@ st.write(
     f"(± {std_width} × std dev)"
 )
 
-# Compute range ± 1 standard deviation
-lower_bound = target_price - std_price
-upper_bound = target_price + std_price
-
-
-st.markdown(f"""
-### 📌 Price Range (± 1 Standard Deviation)
-**Lower Bound:** ${lower_bound:,.0f}  
-**Upper Bound:** ${upper_bound:,.0f}  
-""")
-
 # Highlight this range on histogram
 fig_range = px.histogram(
     filtered,
