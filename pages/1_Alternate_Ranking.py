@@ -49,16 +49,6 @@ fig_hist = px.histogram(
 )
 st.plotly_chart(fig_hist, use_container_width=True)
 
-# Optional boxplot for more insight
-with st.expander("Show Boxplot"):
-    fig_box = px.box(
-        filtered,
-        y="ClosePrice",
-        title="Close Price Boxplot"
-    )
-    st.plotly_chart(fig_box, use_container_width=True)
-
-# -------------------- Target Price + Std Dev --------------------
 # -------------------- Target Price + Std Dev --------------------
 st.subheader("🎯 Choose a Target Price (via slider)")
 
@@ -77,6 +67,31 @@ target_price = st.slider(
     value=int(mean_price),
     step=step_size,
     help="Select a target price. We will compute ±1 standard deviation around it."
+)
+
+# Compute close price distribution
+sample_mean = df_zip["close_price"].mean()
+sample_std = df_zip["close_price"].std()
+
+# --- NEW: Allow user to adjust price range width ---
+st.subheader("📏 Price Range Width")
+
+std_width = st.slider(
+    "Select width (multiples of standard deviation):",
+    min_value=0.5,
+    max_value=3.0,
+    value=1.0,
+    step=0.1,
+    help="Controls how wide the acceptable price band is."
+)
+
+# Compute dynamic price range
+lower_bound = target_price - std_width * sample_std
+upper_bound = target_price + std_width * sample_std
+
+st.write(
+    f"**Price Range:** ${lower_bound:,.0f} – ${upper_bound:,.0f} "
+    f"(± {std_width} × std dev)"
 )
 
 # Compute range ± 1 standard deviation
