@@ -15,7 +15,7 @@ def load_data():
     usecols = [
         "ListAgentFullName","is_closed","DaysOnMarket","pricing_accuracy",
         "PostalCode","ClosePrice","ElementarySchool","SubdivisionName",
-        "CloseDate"
+        "CloseDate", "PropertyCondition"
     ]
     return pd.read_csv(url, usecols=usecols)
 
@@ -84,8 +84,25 @@ if filtered.empty:
 
 st.info(f"Showing results for CloseDate ≥ {cutoff_date.date()} (last {years_back} year(s))")
 
+# (d) Only Look at Resale (not 'New Construction' or 'Updated/Remodeled')
+import ast
 
+def is_resale(x):
+    # Case 1: real list
+    if isinstance(x, list):
+        return x[0] == "Resale"
+    # Case 2: string like "['Resale','Good']"
+    if isinstance(x, str):
+        try:
+            xx = ast.literal_eval(x)
+            return isinstance(xx, list) and xx[0] == "Resale"
+        except:
+            return False
+    return False
 
+filtered = filtered[filtered["PropertyCondition"].apply(is_resale)]
+
+st.info(f"📊 Sample size after filtering for Resale properties: {len(filtered)}")
 
 # -------------------- Visualize Close Price Distribution --------------------
 st.subheader("📊 Close Price Distribution")
