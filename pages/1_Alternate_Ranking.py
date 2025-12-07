@@ -47,7 +47,7 @@ else:
     st.error("Column 'ElementarySchool' not found in dataset.")
     st.stop()
 
-selected_schools = st.multiselect("🏫 Choose an Elementary School", , options=school_list)
+selected_schools = st.multiselect("🏫 Choose an Elementary School", options=school_list)
 
 # Apply second-level filter
 filtered = filtered[filtered["ElementarySchool"].isin(selected_schools)]
