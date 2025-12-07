@@ -58,8 +58,6 @@ if filtered.empty:
 
 # (c) TIME WINDOW FILTER (based on CloseDate)
 # Ensure CloseDate is treated as datetime
-st.write("Columns:", filtered.columns.tolist())
-
 filtered["CloseDate"] = pd.to_datetime(filtered["CloseDate"], errors="coerce")
 
 window_options = {
