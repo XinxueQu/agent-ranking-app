@@ -21,6 +21,8 @@ def load_data():
 data = load_data()
 
 # -------------------- Filters --------------------
+
+# (a) ZIP CODE SELECTION
 st.subheader("📍 Choose Zipcodes")
 
 zip_options = sorted(data["PostalCode"].dropna().astype(str).unique())
@@ -36,6 +38,53 @@ filtered = data[data["PostalCode"].astype(str).isin(zipcodes)]
 if filtered.empty:
     st.warning("No data found for selected zipcodes.")
     st.stop()
+
+# (b) ELEMENTARY SCHOOL SELECTION
+# Extract unique elementary schools for the chosen zipcode
+if "ElementarySchool" in filtered.columns:
+    school_list = sorted(filtered["ElementarySchool"].dropna().unique())
+else:
+    st.error("Column 'ElementarySchool' not found in dataset.")
+    st.stop()
+
+selected_schools = st.multiselect("🏫 Choose an Elementary School", , options=school_list)
+
+# Apply second-level filter
+filtered = filtered[filtered["ElementarySchool"].isin(selected_schools)]
+
+if filtered.empty:
+    st.warning("No data available for this school district.")
+    st.stop()
+
+# (c) TIME WINDOW FILTER (based on CloseDate)
+# Ensure CloseDate is treated as datetime
+df["CloseDate"] = pd.to_datetime(df["CloseDate"], errors="coerce")
+
+# Let user choose a look-back window
+window_options = {
+    "Past 1 Year": 1,
+    "Past 2 Years": 2,
+    "Past 3 Years": 3
+}
+
+selected_window_label = st.selectbox("⏳ Choose Time Window", list(window_options.keys()))
+years_back = window_options[selected_window_label]
+
+# Determine the cutoff date (max date in dataset gives more stable behavior)
+latest_date = df["CloseDate"].max()
+cutoff_date = latest_date - pd.DateOffset(years=years_back)
+
+# Apply time filter to the ZIP+School filtered data
+filtered = filtered[filtered["CloseDate"] >= cutoff_date]
+
+if filtered.empty:
+    st.warning(f"No records available for the selected time window ({selected_window_label}).")
+    st.stop()
+
+st.info(f"Showing results for CloseDate ≥ {cutoff_date.date()} (last {years_back} year(s))")
+
+
+
 
 # -------------------- Visualize Close Price Distribution --------------------
 st.subheader("📊 Close Price Distribution")
