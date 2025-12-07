@@ -125,7 +125,7 @@ mean_price = filtered["ClosePrice"].mean()
 std_price = filtered["ClosePrice"].std()
 
 # Choose a reasonable step (e.g., $1,000)
-step_size = max(1000, int((max_price - min_price) / 200))
+step_size = min(5000, int((max_price - min_price) / 200))
 
 target_price = st.slider(
     "Select Target Close Price",
@@ -145,8 +145,8 @@ st.subheader("📏 Price Range Width")
 
 std_width = st.slider(
     "Select width (multiples of standard deviation):",
-    min_value=0.5,
-    max_value=3.0,
+    min_value=1.5,
+    max_value=2.0,
     value=1.0,
     step=0.1,
     help="Controls how wide the acceptable price band is."
