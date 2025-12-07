@@ -57,7 +57,7 @@ if filtered.empty:
 
 # (c) TIME WINDOW FILTER (based on CloseDate)
 # Ensure CloseDate is treated as datetime
-filtered["CloseDate"] = filtered.to_datetime(filtered["CloseDate"], errors="coerce")
+filtered["CloseDate"] = pd.to_datetime(filtered["CloseDate"], errors="coerce")
 
 # Let user choose a look-back window
 window_options = {
