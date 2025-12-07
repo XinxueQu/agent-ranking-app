@@ -14,7 +14,8 @@ def load_data():
     url = "https://docs.google.com/spreadsheets/d/1UktHniggnt5YMQ_UA8IG9uo_L9PXbcIQ/export?format=csv"
     usecols = [
         "ListAgentFullName","is_closed","DaysOnMarket","pricing_accuracy",
-        "PostalCode","ClosePrice","ElementarySchool","SubdivisionName"
+        "PostalCode","ClosePrice","ElementarySchool","SubdivisionName",
+        "CloseDate"
     ]
     return pd.read_csv(url, usecols=usecols)
 
