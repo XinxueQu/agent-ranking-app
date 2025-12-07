@@ -43,19 +43,19 @@ if filtered.empty:
 
 # (b) ELEMENTARY SCHOOL SELECTION
 # Extract unique elementary schools for the chosen zipcode
-if "ElementarySchool" in filtered.columns:
-    school_list = sorted(filtered["ElementarySchool"].dropna().unique())
-else:
-    st.error("Column 'ElementarySchool' not found in dataset.")
-    st.stop()
+#if "ElementarySchool" in filtered.columns:
+#    school_list = sorted(filtered["ElementarySchool"].dropna().unique())
+#else:
+#    st.error("Column 'ElementarySchool' not found in dataset.")
+#    st.stop()
 
-selected_schools = st.multiselect("🏫 Choose an Elementary School", options=school_list)
+#selected_schools = st.multiselect("🏫 Choose an Elementary School", options=school_list)
 
-filtered = filtered[filtered["ElementarySchool"].isin(selected_schools)]
+#filtered = filtered[filtered["ElementarySchool"].isin(selected_schools)]
 
-if filtered.empty:
-    st.warning("No data available for this school district.")
-    st.stop()
+#if filtered.empty:
+#    st.warning("No data available for this school district.")
+#    st.stop()
 
 # (c) TIME WINDOW FILTER (based on CloseDate)
 # Ensure CloseDate is treated as datetime
