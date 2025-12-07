@@ -11,7 +11,7 @@ st.write("This page lets you explore price distributions by zipcode and target a
 # -------------------- Load Data --------------------
 @st.cache_data
 def load_data():
-    url = "https://docs.google.com/spreadsheets/d/1l2rpwwL8hEwKgum24m_hTWmTNvcy1zZyK2D4LfOh-jk/edit?gid=659960945#gid=659960945"
+    url = "https://docs.google.com/spreadsheets/d/1l2rpwwL8hEwKgum24m_hTWmTNvcy1zZyK2D4LfOh-jk/edit?usp=sharing"
     usecols = [
         "ListAgentFullName","is_closed","DaysOnMarket","pricing_accuracy",
         "PostalCode","ClosePrice","ElementarySchool","SubdivisionName",
@@ -83,24 +83,9 @@ if filtered.empty:
 st.info(f"Showing results for CloseDate ≥ {cutoff_date.date()} (last {years_back} year(s))")
 
 # (d) Only Look at Resale (not 'New Construction' or 'Updated/Remodeled')
-import ast
-
-def is_resale(x):
-    # Case 1: real list
-    if isinstance(x, list):
-        return x[0] == "Resale"
-    # Case 2: string like "['Resale','Good']"
-    if isinstance(x, str):
-        try:
-            xx = ast.literal_eval(x)
-            return isinstance(xx, list) and xx[0] == "Resale"
-        except:
-            return False
-    return False
-
 st.info(f"📊 Sample size BEFORE filtering for Resale properties: {len(filtered)}")
 
-filtered = filtered[filtered["PropertyCondition"].apply(is_resale)]
+filtered = filtered[filtered["PropertyCondition"]=='Resale']
 
 st.info(f"📊 Sample size after filtering for Resale properties: {len(filtered)}")
 
