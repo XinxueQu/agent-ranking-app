@@ -18,7 +18,7 @@ def load_data():
         "PostalCode","ClosePrice","ElementarySchool","SubdivisionName",
         "CloseDate", "PropertyCondition"
     ]
-    return pd.read_excel(xlsx_url, usecols=usecols)
+    return pd.read_excel(xlsx_url, engine="openpyxl", usecols=usecols)
 
 data = load_data()
 
