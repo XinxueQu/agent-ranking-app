@@ -16,7 +16,7 @@ def load_data():
     usecols = [
         "ListAgentFullName","StandardStatus","DaysOnMarket", " OriginalListPrice",  #"pricing_accuracy", "ElementarySchool",
         "PostalCode","ClosePrice","SubdivisionName",
-        "CloseDate", "PropertyCondition"
+        "CloseDate", "PropertyCondition", "TruePrice"
     ]
     return pd.read_excel(xlsx_url, engine="openpyxl", usecols=usecols)
 
