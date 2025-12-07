@@ -49,7 +49,6 @@ else:
 
 selected_schools = st.multiselect("🏫 Choose an Elementary School", options=school_list)
 
-# Apply second-level filter
 filtered = filtered[filtered["ElementarySchool"].isin(selected_schools)]
 
 if filtered.empty:
@@ -58,7 +57,7 @@ if filtered.empty:
 
 # (c) TIME WINDOW FILTER (based on CloseDate)
 # Ensure CloseDate is treated as datetime
-df["CloseDate"] = pd.to_datetime(df["CloseDate"], errors="coerce")
+filtered["CloseDate"] = filtered.to_datetime(filtered["CloseDate"], errors="coerce")
 
 # Let user choose a look-back window
 window_options = {
@@ -71,7 +70,7 @@ selected_window_label = st.selectbox("⏳ Choose Time Window", list(window_optio
 years_back = window_options[selected_window_label]
 
 # Determine the cutoff date (max date in dataset gives more stable behavior)
-latest_date = df["CloseDate"].max()
+latest_date = filtered["CloseDate"].max()
 cutoff_date = latest_date - pd.DateOffset(years=years_back)
 
 # Apply time filter to the ZIP+School filtered data
