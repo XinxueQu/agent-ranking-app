@@ -14,8 +14,8 @@ def load_data():
     xlsx_url = f"https://docs.google.com/spreadsheets/d/e/2PACX-1vQdtiJ3VFCxrdBNfKGJ-KjZasH7-wRJyZ0fgtbNIeYn4iRY4wl9Md2uWJ7deGINNIp2f9aPSBOI39aM/pub?output=xlsx"
     
     usecols = [
-        "ListAgentFullName","is_closed","DaysOnMarket","pricing_accuracy",
-        "PostalCode","ClosePrice","ElementarySchool","SubdivisionName",
+        "ListAgentFullName","StandardStatus","DaysOnMarket",   #"pricing_accuracy", "ElementarySchool",
+        "PostalCode","ClosePrice","SubdivisionName",
         "CloseDate", "PropertyCondition"
     ]
     return pd.read_excel(xlsx_url, engine="openpyxl", usecols=usecols)
@@ -199,7 +199,7 @@ agent_stats = (
     .agg(
         total_records = ("ListAgentFullName", "count"),
         total_sales   = ("ClosePrice", "sum"),
-        closed_count  = ("is_closed", "sum"),
+        closed_count  = ("StandardStatus", "sum"),
         avg_days      = ("DaysOnMarket", "mean"),
         median_days   = ("DaysOnMarket", "median"),
         avg_pricing_accuracy = ("pricing_accuracy", "mean")
