@@ -98,6 +98,8 @@ def is_resale(x):
             return False
     return False
 
+st.info(f"📊 Sample size BEFORE filtering for Resale properties: {len(filtered)}")
+
 filtered = filtered[filtered["PropertyCondition"].apply(is_resale)]
 
 st.info(f"📊 Sample size after filtering for Resale properties: {len(filtered)}")
