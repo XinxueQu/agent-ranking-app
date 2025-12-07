@@ -14,7 +14,7 @@ def load_data():
     xlsx_url = f"https://docs.google.com/spreadsheets/d/e/2PACX-1vQdtiJ3VFCxrdBNfKGJ-KjZasH7-wRJyZ0fgtbNIeYn4iRY4wl9Md2uWJ7deGINNIp2f9aPSBOI39aM/pub?output=xlsx"
     
     usecols = [
-        "ListAgentFullName","StandardStatus","DaysOnMarket",   #"pricing_accuracy", "ElementarySchool",
+        "ListAgentFullName","StandardStatus","DaysOnMarket", " OriginalListPrice",  #"pricing_accuracy", "ElementarySchool",
         "PostalCode","ClosePrice","SubdivisionName",
         "CloseDate", "PropertyCondition"
     ]
@@ -192,6 +192,9 @@ if in_range.empty:
 # Build Agent Summary from in_range dataset
 # ---------------------------------------------------------------
 rank_df = in_range.copy()
+
+# Calculate pricing accuracy
+rank_df['pricing_accuracy'] = rank_df['TruePrice'] / rank_df[' OriginalListPrice']
 
 # Compute simple metrics
 agent_stats = (
