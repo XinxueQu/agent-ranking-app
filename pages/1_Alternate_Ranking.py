@@ -57,9 +57,7 @@ if filtered.empty:
 
 # (c) TIME WINDOW FILTER (based on CloseDate)
 # Ensure CloseDate is treated as datetime
-filtered["CloseDate"] = pd.to_datetime(filtered["CloseDate"], errors="coerce")
-
-# Let user choose a look-back window
+#filtered["CloseDate"] = pd.to_datetime(filtered["CloseDate"], errors="coerce")
 window_options = {
     "Past 1 Year": 1,
     "Past 2 Years": 2,
