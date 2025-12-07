@@ -180,7 +180,7 @@ fig_range.add_vrect(
 st.plotly_chart(fig_range, use_container_width=True)
 
 # -------------------- Show Listings Inside the Range --------------------
-st.subheader("📄 Listings Within Target Range")
+st.subheader("📄 Listings Within Target Range (Raw Data of Selected Sample)")
 
 in_range = filtered[
     (filtered["ClosePrice"] >= lower_bound) &
@@ -190,3 +190,131 @@ in_range = filtered[
 st.write(f"Found **{len(in_range)}** listings within ±1 SD of your target price.")
 
 st.dataframe(in_range, use_container_width=True)
+
+
+
+# ===============================================================
+# 🚀 AGENT RANKING SECTION (Local Filtered Market)
+# ===============================================================
+st.header("🏆 Agent Rankings (Based on Filtered Listings--Local Market)")
+
+if in_range.empty:
+    st.warning("No listings in the selected price range → unable to compute agent rankings.")
+    st.stop()
+
+# ---------------------------------------------------------------
+# Build Agent Summary from in_range dataset
+# ---------------------------------------------------------------
+rank_df = in_range.copy()
+
+# Compute simple metrics
+agent_stats = (
+    rank_df.groupby("ListAgentFullName", dropna=False)
+    .agg(
+        total_records = ("ListAgentFullName", "count"),
+        total_sales   = ("ClosePrice", "sum"),
+        closed_count  = ("is_closed", "sum"),
+        avg_days      = ("DaysOnMarket", "mean"),
+        median_days   = ("DaysOnMarket", "median"),
+        avg_pricing_accuracy = ("pricing_accuracy", "mean")
+    )
+    .reset_index()
+)
+
+# Derived metrics
+agent_stats["close_rate"] = agent_stats["closed_count"] / agent_stats["total_records"]
+
+def pricing_accuracy_score(x): return (1 - abs(x - 1)) * 100
+def percentile_score(s): return s.rank(pct=True) * 100
+def score_days_on_market(s): return 100 - s.rank(pct=True) * 100
+
+agent_stats["pricing_accuracy_score"] = agent_stats["avg_pricing_accuracy"].apply(pricing_accuracy_score)
+agent_stats["volume_score"]           = percentile_score(agent_stats["total_records"])
+agent_stats["sales_score"]            = percentile_score(agent_stats["total_sales"])
+agent_stats["close_rate_score"]       = percentile_score(agent_stats["close_rate"])
+agent_stats["days_on_market_score"]   = score_days_on_market(agent_stats["median_days"])
+
+# ---------------------------------------------------------------
+# Weight inputs
+# ---------------------------------------------------------------
+st.subheader("⚖️ Scoring Weights")
+
+col_w1, col_w2, col_w3, col_w4 = st.columns(4)
+weight_volume = col_w1.number_input("📦 Volume", value=0.4)
+weight_close  = col_w2.number_input("🔒 Close Rate", value=0.3)
+weight_days   = col_w3.number_input("⏳ Days on Market", value=0.2)
+weight_price  = col_w4.number_input("🎯 Pricing Accuracy", value=0.1)
+
+total_weight = weight_volume + weight_close + weight_days + weight_price
+if total_weight == 0:
+    st.error("All weights are zero — cannot rank agents.")
+    st.stop()
+
+if total_weight != 1:
+    weight_volume /= total_weight
+    weight_close  /= total_weight
+    weight_days   /= total_weight
+    weight_price  /= total_weight
+    st.info("Weights normalized to sum to 1.")
+
+# ---------------------------------------------------------------
+# Compute Overall Score
+# ---------------------------------------------------------------
+agent_stats["overall_score"] = (
+    weight_volume * agent_stats["volume_score"] +
+    weight_close  * agent_stats["close_rate_score"] +
+    weight_days   * agent_stats["days_on_market_score"] +
+    weight_price  * agent_stats["pricing_accuracy_score"]
+)
+
+# ---------------------------------------------------------------
+# Ranking
+# ---------------------------------------------------------------
+agent_stats["Rank"] = agent_stats["overall_score"].rank(ascending=False, method="dense").astype(int)
+agent_stats = agent_stats.sort_values(["Rank", "overall_score"])
+
+# Display final ranking
+st.subheader("🏅 Ranked Agents (within selected filters & price window)")
+st.dataframe(agent_stats, use_container_width=True)
+
+# ---------------------------------------------------------------
+# Optional: Agent Detail Selection + Radar Chart
+# ---------------------------------------------------------------
+st.subheader("📐 Compare an Agent Across Dimensions")
+
+agent_list = agent_stats["ListAgentFullName"].tolist()
+selected_agent = st.selectbox("Choose an agent to inspect", agent_list)
+
+if selected_agent:
+    row = agent_stats[agent_stats["ListAgentFullName"] == selected_agent].iloc[0]
+
+    dim_labels = [
+        "Volume Score", "Close Rate Score", "Days on Market Score", "Pricing Accuracy Score"
+    ]
+    dim_values = [
+        row["volume_score"],
+        row["close_rate_score"],
+        row["days_on_market_score"],
+        row["pricing_accuracy_score"]
+    ]
+
+    radar_df = pd.DataFrame({"Dimension": dim_labels, "Score": dim_values})
+
+    fig_radar = px.line_polar(
+        radar_df,
+        r="Score",
+        theta="Dimension",
+        line_close=True,
+        range_r=[0, 100],
+        title=f"Performance Profile: {selected_agent}"
+    )
+    st.plotly_chart(fig_radar, use_container_width=True)
+
+    st.subheader("📊 Raw Metrics")
+    raw_cols = [
+        "total_records", "closed_count", "close_rate",
+        "avg_days", "median_days",
+        "avg_pricing_accuracy", "total_sales"
+    ]
+    st.dataframe(row[["ListAgentFullName"] + raw_cols], use_container_width=True)
+
