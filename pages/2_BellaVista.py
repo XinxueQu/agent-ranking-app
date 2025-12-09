@@ -199,6 +199,13 @@ if in_range.empty:
 # ---------------------------------------------------------------
 rank_df = in_range.copy()
 
+total_rows = len(rank_df["StandardStatus"])
+closed_rows = rank_df["StandardStatus"].str.strip().str.lower().eq("closed").sum()
+
+st.metric("Total Status Rows", total_rows)
+st.metric("Number of 'Closed'", closed_rows)
+
+
 # Calculate pricing accuracy
 rank_df['pricing_accuracy'] = rank_df['TruePrice'] / rank_df[' OriginalListPrice']
 
