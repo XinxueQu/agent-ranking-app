@@ -319,3 +319,16 @@ if selected_agent:
         "avg_pricing_accuracy", "total_sales"
     ]
     st.dataframe(row[["ListAgentFullName"] + raw_cols], use_container_width=True)
+
+
+# ---------------------------------------------------------------
+# Show Raw Listings for Selected Agent
+# ---------------------------------------------------------------
+st.subheader(f"📄 Raw Listings for Agent: {selected_agent}")
+
+agent_raw = rank_df[rank_df["ListAgentFullName"] == selected_agent].copy()
+
+if agent_raw.empty:
+    st.info("No raw listings available for this agent within the current filters.")
+else:
+    st.dataframe(agent_raw, use_container_width=True)
