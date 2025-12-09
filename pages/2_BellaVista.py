@@ -75,7 +75,7 @@ latest_date = filtered["CloseDate"].max()
 cutoff_date = latest_date - pd.DateOffset(years=years_back)
 
 # Apply time filter to the ZIP+School filtered data
-filtered = filtered[filtered["CloseDate"] >= cutoff_date]
+filtered = filtered[(filtered["CloseDate"] >= cutoff_date) | (filtered["CloseDate"].isna())] #filtered["CloseDate"] >= cutoff_date]
 
 if filtered.empty:
     st.warning(f"No records available for the selected time window ({selected_window_label}).")
