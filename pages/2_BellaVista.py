@@ -173,6 +173,7 @@ st.plotly_chart(fig_range, use_container_width=True)
 
 # -------------------- Show Listings Inside the Range --------------------
 st.subheader("📄 Listings Within Target Range (Raw Data of Selected Sample)")
+filtered["ClosePrice"] = pd.to_numeric(filtered["ClosePrice"], errors="coerce")
 
 in_range = filtered[
     ((filtered["ClosePrice"] >= lower_bound) &
