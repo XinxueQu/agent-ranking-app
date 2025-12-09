@@ -59,6 +59,15 @@ if filtered.empty:
 
 # (c) TIME WINDOW FILTER (based on CloseDate)
 # Ensure CloseDate is treated as datetime
+# ---- (1) Clean CloseDate BEFORE conversion ----
+filtered["CloseDate"] = (
+    filtered["CloseDate"]
+        .astype(str)
+        .str.strip()
+        .replace(["", "None", "nan"], pd.NA)
+)
+
+# ---- (2) Convert once ----
 filtered["CloseDate"] = pd.to_datetime(filtered["CloseDate"], errors="coerce")
 
 window_options = {
@@ -69,12 +78,6 @@ window_options = {
 
 selected_window_label = st.selectbox("⏳ Choose Time Window", list(window_options.keys()))
 years_back = window_options[selected_window_label]
-
-filtered["CloseDate"] = (
-    filtered["CloseDate"]
-        .replace(["", " ", "None", "nan"], pd.NA)   # convert empties to NA
-        .astype("datetime64[ns]")                    # convert to datetime
-)
 
 # Determine the cutoff date (max date in dataset gives more stable behavior)
 latest_date = filtered["CloseDate"].max()
@@ -198,13 +201,6 @@ if in_range.empty:
 # Build Agent Summary from in_range dataset
 # ---------------------------------------------------------------
 rank_df = in_range.copy()
-
-total_rows = len(rank_df["StandardStatus"])
-closed_rows = rank_df["StandardStatus"].str.strip().str.lower().eq("closed").sum()
-
-st.metric("Total Status Rows", total_rows)
-st.metric("Number of 'Closed'", closed_rows)
-
 
 # Calculate pricing accuracy
 rank_df['pricing_accuracy'] = rank_df['TruePrice'] / rank_df[' OriginalListPrice']
