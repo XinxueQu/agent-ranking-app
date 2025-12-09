@@ -224,7 +224,9 @@ agent_stats = (
 agent_stats["close_rate"] = agent_stats["closed_count"] / agent_stats["total_records"]
 
 def pricing_accuracy_score(x): return (1 - abs(x - 1)) * 100
-def percentile_score(s): return s.rank(pct=True) * 100
+#def percentile_score(s): return s.rank(pct=True) * 100
+def percentile_score(s):
+    return 100 * (s - s.min()) / (s.max() - s.min())
 def score_days_on_market(s): return 100 - s.rank(pct=True) * 100
 
 agent_stats["pricing_accuracy_score"] = agent_stats["avg_pricing_accuracy"].apply(pricing_accuracy_score)
