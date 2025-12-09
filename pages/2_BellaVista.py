@@ -28,7 +28,7 @@ data = load_data()
 st.subheader("📍 Choose Zipcodes")
 
 zip_options = sorted(data["PostalCode"].dropna().astype(str).unique())
-zipcodes = st.multiselect("Select Zipcode(s)", options=zip_options)f
+zipcodes = st.multiselect("Select Zipcode(s)", options=zip_options)
 
 if not zipcodes:
     st.info("Please select at least one zipcode to proceed.")
