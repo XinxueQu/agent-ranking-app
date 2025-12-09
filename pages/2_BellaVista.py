@@ -269,6 +269,7 @@ agent_stats["overall_score"] = (
 # ---------------------------------------------------------------
 # Ranking
 # ---------------------------------------------------------------
+agent_stats["overall_score"] = agent_stats["overall_score"].fillna(0)# to handle missing values
 agent_stats["Rank"] = agent_stats["overall_score"].rank(ascending=False, method="dense").astype(int)
 agent_stats = agent_stats.sort_values(["Rank", "overall_score"])
 
