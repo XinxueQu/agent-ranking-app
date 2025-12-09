@@ -196,7 +196,7 @@ rank_df = in_range.copy()
 # Calculate pricing accuracy
 rank_df['pricing_accuracy'] = rank_df['TruePrice'] / rank_df[' OriginalListPrice']
 
-rank_df["is_closed_flag"] = rank_df["StandardStatus"].str.strip().str.lower().eq("closed").astype(int)
+rank_df["is_closed_flag"] = rank_df["StandardStatus"].str.lower().eq("closed").astype(int) #.str.strip()
 
 # Compute simple metrics
 agent_stats = (
