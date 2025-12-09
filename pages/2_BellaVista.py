@@ -68,23 +68,30 @@ filtered["CloseDate"] = (
 )
 
 # ---- (2) Convert once ----
+# ---- (1) Clean CloseDate BEFORE conversion ----
+filtered["CloseDate"] = (
+    filtered["CloseDate"]
+        .astype(str)
+        .str.strip()
+        .replace(["", "None", "nan"], pd.NA)
+)
+
+# ---- (2) Convert once ----
 filtered["CloseDate"] = pd.to_datetime(filtered["CloseDate"], errors="coerce")
 
-window_options = {
-    "Past 1 Year": 1,
-    "Past 2 Years": 2,
-    "Past 3 Years": 3
-}
-
+# ---- (3) Get time window ----
+window_options = {"Past 1 Year": 1, "Past 2 Years": 2, "Past 3 Years": 3}
 selected_window_label = st.selectbox("⏳ Choose Time Window", list(window_options.keys()))
 years_back = window_options[selected_window_label]
 
-# Determine the cutoff date (max date in dataset gives more stable behavior)
+# Determine cutoff date based on latest valid date
 latest_date = filtered["CloseDate"].max()
 cutoff_date = latest_date - pd.DateOffset(years=years_back)
 
-# Apply time filter to the ZIP+School filtered data
-filtered = filtered[(filtered["CloseDate"] >= cutoff_date) | (filtered["CloseDate"].isna())] #filtered["CloseDate"] >= cutoff_date]
+# ---- (4) Apply filter: KEEP missing CloseDate ----
+filtered = filtered[
+    (filtered["CloseDate"] >= cutoff_date) | (filtered["CloseDate"].isna())
+]
 
 if filtered.empty:
     st.warning(f"No records available for the selected time window ({selected_window_label}).")
