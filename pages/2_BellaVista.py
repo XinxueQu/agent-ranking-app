@@ -70,6 +70,12 @@ window_options = {
 selected_window_label = st.selectbox("⏳ Choose Time Window", list(window_options.keys()))
 years_back = window_options[selected_window_label]
 
+filtered["CloseDate"] = (
+    filtered["CloseDate"]
+        .replace(["", " ", "None", "nan"], pd.NA)   # convert empties to NA
+        .astype("datetime64[ns]")                    # convert to datetime
+)
+
 # Determine the cutoff date (max date in dataset gives more stable behavior)
 latest_date = filtered["CloseDate"].max()
 cutoff_date = latest_date - pd.DateOffset(years=years_back)
