@@ -28,7 +28,7 @@ data = load_data()
 st.subheader("📍 Choose Zipcodes")
 
 zip_options = sorted(data["PostalCode"].dropna().astype(str).unique())
-zipcodes = st.multiselect("Select Zipcode(s)", options=zip_options)
+zipcodes = st.multiselect("Select Zipcode(s)", options=zip_options)f
 
 if not zipcodes:
     st.info("Please select at least one zipcode to proceed.")
@@ -58,7 +58,6 @@ if filtered.empty:
 #    st.stop()
 
 # (c) TIME WINDOW FILTER (based on CloseDate)
-# Ensure CloseDate is treated as datetime
 # ---- (1) Clean CloseDate BEFORE conversion ----
 filtered["CloseDate"] = (
     filtered["CloseDate"]
@@ -177,9 +176,8 @@ st.subheader("📄 Listings Within Target Range (Raw Data of Selected Sample)")
 
 in_range = filtered[
     ((filtered["ClosePrice"] >= lower_bound) &
-    (filtered["ClosePrice"] <= upper_bound)) |
-    (filtered["ClosePrice"].isna()
-
+     (filtered["ClosePrice"] <= upper_bound)) |
+    (filtered["ClosePrice"].isna())
 ]
 
 st.write(f"Found **{len(in_range)}** listings within ±1 SD of your target price.")
