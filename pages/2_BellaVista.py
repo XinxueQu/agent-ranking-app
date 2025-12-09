@@ -196,7 +196,7 @@ rank_df = in_range.copy()
 # Calculate pricing accuracy
 rank_df['pricing_accuracy'] = rank_df['TruePrice'] / rank_df[' OriginalListPrice']
 
-rank_df["is_closed_flag"] = rank_df["StandardStatus"].str.lower().eq("closed").astype(int) #.str.strip()
+#rank_df["is_closed_flag"] = rank_df["StandardStatus"].str.lower().eq("closed").astype(int) #.str.strip()
 
 # Compute simple metrics
 agent_stats = (
@@ -204,7 +204,7 @@ agent_stats = (
     .agg(
         total_records = ("ListAgentFullName", "count"),
         total_sales   = ("ClosePrice", "sum"),
-        closed_count  = ("is_closed_flag", "sum"),
+        closed_count  = ("StandardStatus", lambda x: (x.str.lower() == "closed").sum()), #("is_closed_flag", "sum"),
         avg_days      = ("DaysOnMarket", "mean"),
         median_days   = ("DaysOnMarket", "median"),
         avg_pricing_accuracy = ("pricing_accuracy", "mean")
