@@ -68,15 +68,6 @@ filtered["CloseDate"] = (
 )
 
 # ---- (2) Convert once ----
-# ---- (1) Clean CloseDate BEFORE conversion ----
-filtered["CloseDate"] = (
-    filtered["CloseDate"]
-        .astype(str)
-        .str.strip()
-        .replace(["", "None", "nan"], pd.NA)
-)
-
-# ---- (2) Convert once ----
 filtered["CloseDate"] = pd.to_datetime(filtered["CloseDate"], errors="coerce")
 
 # ---- (3) Get time window ----
@@ -185,8 +176,10 @@ st.plotly_chart(fig_range, use_container_width=True)
 st.subheader("📄 Listings Within Target Range (Raw Data of Selected Sample)")
 
 in_range = filtered[
-    (filtered["ClosePrice"] >= lower_bound) &
-    (filtered["ClosePrice"] <= upper_bound)
+    ((filtered["ClosePrice"] >= lower_bound) &
+    (filtered["ClosePrice"] <= upper_bound)) |
+    (filtered["ClosePrice"].isna()
+
 ]
 
 st.write(f"Found **{len(in_range)}** listings within ±1 SD of your target price.")
