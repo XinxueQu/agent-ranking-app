@@ -15,7 +15,7 @@ def load_data():
     usecols = [
         "ListAgentFullName","is_closed","DaysOnMarket","pricing_accuracy",
         "PostalCode","ClosePrice","ElementarySchool","SubdivisionName",
-        "CloseDate", "PropertyCondition", "ListingContractDate"
+        "CloseDate", "PropertyCondition", "ListingContractDate", "ListAgentDirectPhone"
     ]
     return pd.read_csv(url, usecols=usecols)
 
@@ -229,7 +229,11 @@ agent_stats = (
         closed_count  = ("is_closed", "sum"),
         avg_days      = ("DaysOnMarket", "mean"),
         median_days   = ("DaysOnMarket", "median"),
-        avg_pricing_accuracy = ("pricing_accuracy", "mean")
+        avg_pricing_accuracy = ("pricing_accuracy", "mean"),
+         ListAgentDirectPhone = (
+            "ListAgentDirectPhone",
+            lambda x: x.dropna().astype(str).iloc[0] if x.notna().any() else ""
+        )
     )
     .reset_index()
 )
@@ -372,6 +376,10 @@ st.data_editor(
         "overall_score": st.column_config.NumberColumn(
             "Overall Score",
             format="%.1f"
+        ),
+        "ListAgentDirectPhone": st.column_config.TextColumn(
+            "📞 Phone",
+            help="Direct phone number"
         )
     }
 )
@@ -452,6 +460,7 @@ st.plotly_chart(fig_radar, use_container_width=True)
 st.subheader("📊 Raw Metrics (Side-by-Side)")
 
 raw_cols = [
+    "ListAgentDirectPhone",
     "total_records",
     "closed_count",
     "close_rate",
