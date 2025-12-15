@@ -314,7 +314,7 @@ col_f1, col_f2 = st.columns(2)
 
 min_records = col_f1.number_input(
     "Minimum number of listings",
-    min_value=1,
+    min_value=0,
     value=3,
     step=1,
     help="Exclude agents with fewer than this many listings"
