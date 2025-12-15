@@ -11,14 +11,16 @@ st.write("This page lets you explore price distributions by zipcode and target a
 # -------------------- Load Data --------------------
 @st.cache_data
 def load_data():
-    xlsx_url = f"https://docs.google.com/spreadsheets/d/e/2PACX-1vSY3EsuoQPnflnp0mr-1E9EUD4OggkNqvMdxO7m3tAnrxn1u6u13_UXe7vRtU431g/pub?output=xlsx"
+    url = ( "https://docs.google.com/spreadsheets/d/e/"
+    "2PACX-1vQdtiJ3VFCxrdBNfKGJ-KjZasH7-wRJyZ0fgtbNIeYn4iRY4wl9Md2uWJ7deGINNIp2f9aPSBOI39aM"
+    "/pub?output=csv" )
     
     usecols = [
         "ListAgentFullName","StandardStatus","DaysOnMarket", " OriginalListPrice",  #"pricing_accuracy", "ElementarySchool",
         "PostalCode","ClosePrice","SubdivisionName",
         "CloseDate", "PropertyCondition", "TruePrice"
     ]
-    return pd.read_excel(xlsx_url, engine="openpyxl", usecols=usecols)
+    return pd.read_csv(url, usecols=usecols)
 
 data = load_data()
 
