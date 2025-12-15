@@ -319,45 +319,82 @@ selected_rows = st.data_editor(
 }
 )
 
-
 # ---------------------------------------------------------------
-# Optional: Agent Detail Selection + Radar Chart
+# 📐 Compare up to 3 Agents Across Dimensions
 # ---------------------------------------------------------------
-st.subheader("📐 Compare an Agent Across Dimensions")
+st.subheader("📐 Compare Agents Across Dimensions (up to 3)")
 
 agent_list = agent_stats["ListAgentFullName"].tolist()
-selected_agent = st.selectbox("Choose an agent to inspect", agent_list)
 
-if selected_agent:
-    row = agent_stats[agent_stats["ListAgentFullName"] == selected_agent].iloc[0]
+selected_agents = st.multiselect(
+    "Choose up to 3 agents to compare",
+    options=agent_list,
+    max_selections=3
+)
 
-    dim_labels = [
-        "Volume Score", "Close Rate Score", "Days on Market Score", "Pricing Accuracy Score"
-    ]
-    dim_values = [
-        row["volume_score"],
-        row["close_rate_score"],
-        row["days_on_market_score"],
-        row["pricing_accuracy_score"]
-    ]
+if not selected_agents:
+    st.info("Select one or more agents to view comparison.")
+    st.stop()
 
-    radar_df = pd.DataFrame({"Dimension": dim_labels, "Score": dim_values})
+# ---------------------------------------------------------------
+# Prepare data for radar chart
+# ---------------------------------------------------------------
+radar_rows = []
 
-    fig_radar = px.line_polar(
-        radar_df,
-        r="Score",
-        theta="Dimension",
-        line_close=True,
-        range_r=[0, 100],
-        title=f"Performance Profile: {selected_agent}"
-    )
-    st.plotly_chart(fig_radar, use_container_width=True)
+for agent in selected_agents:
+    row = agent_stats.loc[
+        agent_stats["ListAgentFullName"] == agent
+    ].iloc[0]
 
-    st.subheader("📊 Raw Metrics")
-    raw_cols = [
-        "total_records", "closed_count", "close_rate",
-        "avg_days", "median_days",
-        "avg_pricing_accuracy", "total_sales"
-    ]
-    st.dataframe(row[["ListAgentFullName"] + raw_cols], use_container_width=True)
+    radar_rows.extend([
+        {"Agent": agent, "Dimension": "Volume Score", "Score": row["volume_score"]},
+        {"Agent": agent, "Dimension": "Close Rate Score", "Score": row["close_rate_score"]},
+        {"Agent": agent, "Dimension": "Days on Market Score", "Score": row["days_on_market_score"]},
+        {"Agent": agent, "Dimension": "Pricing Accuracy Score", "Score": row["pricing_accuracy_score"]},
+    ])
+
+radar_df = pd.DataFrame(radar_rows)
+
+# ---------------------------------------------------------------
+# Radar Chart (multi-agent)
+# ---------------------------------------------------------------
+fig_radar = px.line_polar(
+    radar_df,
+    r="Score",
+    theta="Dimension",
+    color="Agent",
+    line_close=True,
+    range_r=[0, 100],
+    title="Performance Comparison Across Dimensions"
+)
+
+st.plotly_chart(fig_radar, use_container_width=True)
+
+# ---------------------------------------------------------------
+# Raw Metrics Table (side-by-side columns)
+# ---------------------------------------------------------------
+st.subheader("📊 Raw Metrics (Side-by-Side)")
+
+raw_cols = [
+    "total_records",
+    "closed_count",
+    "close_rate",
+    "avg_days",
+    "median_days",
+    "avg_pricing_accuracy",
+    "total_sales"
+]
+
+raw_table = (
+    agent_stats
+    .set_index("ListAgentFullName")
+    .loc[selected_agents, raw_cols]
+    .T
+)
+
+# Improve readability
+raw_table.index.name = "Metric"
+raw_table = raw_table.round(2)
+
+st.dataframe(raw_table, use_container_width=True)
 
