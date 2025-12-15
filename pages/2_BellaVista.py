@@ -11,18 +11,11 @@ st.write("This page lets you explore price distributions by zipcode and target a
 # -------------------- Load Data --------------------
 @st.cache_data
 def load_data():
-    url = ( "https://docs.google.com/spreadsheets/d/e/"
-    "2PACX-1vQdtiJ3VFCxrdBNfKGJ-KjZasH7-wRJyZ0fgtbNIeYn4iRY4wl9Md2uWJ7deGINNIp2f9aPSBOI39aM"
-    "/pub?output=csv" )
-    
-    usecols = [
-        "ListAgentFullName","StandardStatus","DaysOnMarket", " OriginalListPrice",  #"pricing_accuracy", "ElementarySchool",
-        "PostalCode","ClosePrice","SubdivisionName",
-        "CloseDate", "PropertyCondition", "TruePrice"
-    ]
-    return pd.read_csv(url, usecols=usecols)
+    url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQdtiJ3VFCxrdBNfKGJ-KjZasH7-wRJyZ0fgtbNIeYn4iRY4wl9Md2uWJ7deGINNIp2f9aPSBOI39aM/pub?output=csv"
+    return pd.read_csv(url)
 
 data = load_data()
+st.write(data.columns.tolist())
 
 # -------------------- Filters --------------------
 
