@@ -380,7 +380,7 @@ selected_rows = st.data_editor(
     agent_stats,
     use_container_width=True,
     hide_index=True,
-    disabled=True,
+    #disabled=True,
     num_rows="dynamic",
     column_config={
     "overall_score": st.column_config.NumberColumn(
