@@ -308,86 +308,88 @@ agent_stats = agent_stats.sort_values(["Rank", "overall_score"])
 # ---------------------------------------------------------------
 # 🔍 Agent Quality Filters
 # ---------------------------------------------------------------
-st.subheader("🔍 Agent Filters")
 
-col_f1, col_f2 = st.columns(2)
+    if False: 
+    st.subheader("🔍 Agent Filters")
+    
+    col_f1, col_f2 = st.columns(2)
+    
+    min_records = col_f1.number_input(
+        "Minimum number of listings",
+        min_value=0,
+        value=3,
+        step=1,
+        help="Exclude agents with fewer than this many listings"
+    )
+    
+    min_sales = col_f2.number_input(
+        "Minimum total sales ($)",
+        min_value=0,
+        value=0,
+        step=50_000,
+        help="Exclude agents with low total transaction volume"
+    )
+    
+    filtered_agents = agent_stats[
+        (agent_stats["total_records"] >= min_records) &
+        (agent_stats["total_sales"] >= min_sales)
+    ].copy()
+    
+    if filtered_agents.empty:
+        st.warning("No agents meet the selected minimum requirements.")
+        st.stop()
+    
+    filtered_agents["Rank"] = (
+        filtered_agents["overall_score"]
+        .rank(ascending=False, method="dense")
+        .astype("Int64")
+    )
+    
+    filtered_agents = filtered_agents.sort_values(
+        ["Rank", "overall_score"],
+        ascending=[True, False]
+    )
+    
+    st.subheader("🏅 Ranked Agents (interactive)")
+    
+    st.caption(
+        f"Showing {len(filtered_agents)} agents "
+        f"(min {min_records} listings, min ${min_sales:,.0f} sales)"
+    )
+    
+    st.data_editor(
+        filtered_agents,
+        use_container_width=True,
+        hide_index=True,
+        disabled=True,
+        column_config={
+            "overall_score": st.column_config.NumberColumn(
+                "Overall Score",
+                format="%.1f"
+            )
+        }
+    )
 
-min_records = col_f1.number_input(
-    "Minimum number of listings",
-    min_value=0,
-    value=3,
-    step=1,
-    help="Exclude agents with fewer than this many listings"
-)
 
-min_sales = col_f2.number_input(
-    "Minimum total sales ($)",
-    min_value=0,
-    value=0,
-    step=50_000,
-    help="Exclude agents with low total transaction volume"
-)
 
-filtered_agents = agent_stats[
-    (agent_stats["total_records"] >= min_records) &
-    (agent_stats["total_sales"] >= min_sales)
-].copy()
-
-if filtered_agents.empty:
-    st.warning("No agents meet the selected minimum requirements.")
-    st.stop()
-
-filtered_agents["Rank"] = (
-    filtered_agents["overall_score"]
-    .rank(ascending=False, method="dense")
-    .astype("Int64")
-)
-
-filtered_agents = filtered_agents.sort_values(
-    ["Rank", "overall_score"],
-    ascending=[True, False]
-)
 
 st.subheader("🏅 Ranked Agents (interactive)")
 
-st.caption(
-    f"Showing {len(filtered_agents)} agents "
-    f"(min {min_records} listings, min ${min_sales:,.0f} sales)"
-)
 
-st.data_editor(
-    filtered_agents,
+selected_rows = st.data_editor(
+    agent_stats,
     use_container_width=True,
     hide_index=True,
     disabled=True,
+    num_rows="dynamic",
     column_config={
-        "overall_score": st.column_config.NumberColumn(
-            "Overall Score",
-            format="%.1f"
-        )
-    }
+    "overall_score": st.column_config.NumberColumn(
+        "Overall Score",
+        format="%.1f",
+        help="Weighted composite score (0–100)"
+    )
+}
 )
-
-
-
-
-#st.subheader("🏅 Ranked Agents (interactive)")
-
-
-#selected_rows = st.data_editor(
-#    agent_stats,
-#    use_container_width=True,
-#    hide_index=True,
-#    disabled=True,
-#    num_rows="dynamic",
-#    column_config={
-#    "overall_score": st.column_config.NumberColumn(
-#        "Overall Score",
-#        format="%.1f",
-#        help="Weighted composite score (0–100)"
-#    )
-#}
-#)
 
 # ---------------------------------------------------------------
 # 📐 Compare up to 3 Agents Across Dimensions
