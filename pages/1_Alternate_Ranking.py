@@ -238,7 +238,7 @@ agent_stats = (
 )
 
 # Derived metrics
-agent_stats["close_rate"] = agent_stats["closed_count"] / agent_stats["total_records"]
+agent_stats["close_rate"] = agent_stats["closed_count"] / agent_stats["total_records"] # could introduce NAs
 
 def pricing_accuracy_score(x): return (1 - abs(x - 1)) * 100
 def percentile_score(s): return s.rank(pct=True) * 100
@@ -286,7 +286,17 @@ agent_stats["overall_score"] = (
 # ---------------------------------------------------------------
 # Ranking
 # ---------------------------------------------------------------
-agent_stats["Rank"] = agent_stats["overall_score"].rank(ascending=False, method="dense").astype(int)
+agent_stats = agent_stats.replace([np.inf, -np.inf], np.nan)
+agent_stats = agent_stats.dropna(
+    subset=["overall_score"],
+    how="any"
+)
+#agent_stats["Rank"] = agent_stats["overall_score"].rank(ascending=False, method="dense").astype(int)
+agent_stats["Rank"] = (
+    agent_stats["overall_score"]
+    .rank(ascending=False, method="dense")
+    .astype("Int64")   # nullable integer type
+)
 agent_stats = agent_stats.sort_values(["Rank", "overall_score"])
 
 # Display final ranking
