@@ -209,7 +209,7 @@ rank_df = in_range.copy()
 
 # Calculate pricing accuracy
 rank_df["pricing_accuracy"] = np.where(
-    (rank_df["is_closed"] == 1) &
+    (rank_df["StandardStatus"] == "Closed") &
     rank_df["TruePrice"].notna() &
     (rank_df["OriginalListPrice"] > 0),
     rank_df["TruePrice"] / rank_df["OriginalListPrice"],
