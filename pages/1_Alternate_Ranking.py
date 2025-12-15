@@ -15,7 +15,7 @@ def load_data():
     usecols = [
         "ListAgentFullName","is_closed","DaysOnMarket","pricing_accuracy",
         "PostalCode","ClosePrice","ElementarySchool","SubdivisionName",
-        "CloseDate", "PropertyCondition"
+        "CloseDate", "PropertyCondition", "ListingContractDate"
     ]
     return pd.read_csv(url, usecols=usecols)
 
@@ -40,25 +40,40 @@ if filtered.empty:
     st.warning("No data found for selected zipcodes.")
     st.stop()
 
-# (b) ELEMENTARY SCHOOL SELECTION
-# Extract unique elementary schools for the chosen zipcode
-if "ElementarySchool" in filtered.columns:
-    school_list = sorted(filtered["ElementarySchool"].dropna().unique())
-else:
+# (b) ELEMENTARY SCHOOL SELECTION (OPTIONAL)
+st.subheader("🏫 Elementary School (Optional)")
+
+if "ElementarySchool" not in filtered.columns:
     st.error("Column 'ElementarySchool' not found in dataset.")
     st.stop()
 
-selected_schools = st.multiselect("🏫 Choose an Elementary School", options=school_list)
+school_list = sorted(filtered["ElementarySchool"].dropna().unique())
 
-filtered = filtered[filtered["ElementarySchool"].isin(selected_schools)]
+selected_schools = st.multiselect(
+    "Choose Elementary School(s) — leave empty to include all",
+    options=school_list
+)
 
-if filtered.empty:
-    st.warning("No data available for this school district.")
-    st.stop()
+# Apply filter ONLY if user selected something
+if selected_schools:
+    filtered = filtered[filtered["ElementarySchool"].isin(selected_schools)]
+    if filtered.empty:
+        st.warning("No data available for the selected school(s).")
+        st.stop()
 
-# (c) TIME WINDOW FILTER (based on CloseDate)
-# Ensure CloseDate is treated as datetime
-filtered["CloseDate"] = pd.to_datetime(filtered["CloseDate"], errors="coerce")
+# (c) TIME WINDOW FILTER (CloseDate fallback to ListingContractDate)
+
+# Ensure dates are datetime
+filtered["CloseDate"] = pd.to_datetime(filtered.get("CloseDate"), errors="coerce")
+
+# Fallback column (change name if needed)
+if "ListingContractDate" in filtered.columns:
+    filtered["ListingContractDate"] = pd.to_datetime(filtered["ListingContractDate"], errors="coerce")
+else:
+    filtered["ListingContractDate"] = pd.NaT
+
+# Effective date: CloseDate if available, otherwise ListingContractDate
+filtered["effective_date"] = filtered["CloseDate"].fillna(filtered["ListingContractDate"])
 
 window_options = {
     "Past 1 Year": 1,
@@ -69,18 +84,19 @@ window_options = {
 selected_window_label = st.selectbox("⏳ Choose Time Window", list(window_options.keys()))
 years_back = window_options[selected_window_label]
 
-# Determine the cutoff date (max date in dataset gives more stable behavior)
-latest_date = filtered["CloseDate"].max()
+latest_date = filtered["effective_date"].max()
 cutoff_date = latest_date - pd.DateOffset(years=years_back)
 
-# Apply time filter to the ZIP+School filtered data
-filtered = filtered[filtered["CloseDate"] >= cutoff_date]
+filtered = filtered[filtered["effective_date"] >= cutoff_date]
 
 if filtered.empty:
     st.warning(f"No records available for the selected time window ({selected_window_label}).")
     st.stop()
 
-st.info(f"Showing results for CloseDate ≥ {cutoff_date.date()} (last {years_back} year(s))")
+st.info(
+    f"Showing results where CloseDate (or ListingContractDate if missing) ≥ {cutoff_date.date()}"
+)
+
 
 # (d) Only Look at Resale (not 'New Construction' or 'Updated/Remodeled')
 import ast
@@ -274,8 +290,25 @@ agent_stats["Rank"] = agent_stats["overall_score"].rank(ascending=False, method=
 agent_stats = agent_stats.sort_values(["Rank", "overall_score"])
 
 # Display final ranking
-st.subheader("🏅 Ranked Agents (within selected filters & price window)")
-st.dataframe(agent_stats, use_container_width=True)
+#st.subheader("🏅 Ranked Agents (within selected filters & price window)")
+#st.dataframe(agent_stats, use_container_width=True)
+st.subheader("🏅 Ranked Agents (interactive)")
+
+selected_rows = st.data_editor(
+    agent_stats,
+    use_container_width=True,
+    hide_index=True,
+    disabled=True,
+    num_rows="dynamic",
+    column_config={
+        "overall_score": st.column_config.ProgressColumn(
+            "Overall Score",
+            min_value=0,
+            max_value=100
+        )
+    }
+)
+
 
 # ---------------------------------------------------------------
 # Optional: Agent Detail Selection + Radar Chart
