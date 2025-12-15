@@ -93,6 +93,18 @@ st.info(f"📊 Sample size after filtering for Resale properties: {len(filtered)
 # -------------------- Visualize Close Price Distribution --------------------
 st.subheader("📊 Close Price Distribution")
 
+filtered["ClosePrice"] = (
+    filtered["ClosePrice"]
+        .astype(str)
+        .str.replace(r"[,$]", "", regex=True)
+        .str.strip()
+)
+
+filtered["ClosePrice"] = pd.to_numeric(
+    filtered["ClosePrice"],
+    errors="coerce"
+)
+
 fig_hist = px.histogram(
     filtered,
     x="ClosePrice",
