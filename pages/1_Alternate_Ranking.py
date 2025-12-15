@@ -311,12 +311,12 @@ selected_rows = st.data_editor(
     disabled=True,
     num_rows="dynamic",
     column_config={
-        "overall_score": st.column_config.ProgressColumn(
-            "Overall Score",
-            min_value=0,
-            max_value=100
-        )
-    }
+    "overall_score": st.column_config.NumberColumn(
+        "Overall Score",
+        format="%.1f",
+        help="Weighted composite score (0–100)"
+    )
+}
 )
 
 
