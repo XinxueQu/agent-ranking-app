@@ -241,9 +241,20 @@ agent_stats = (
 agent_stats["close_rate"] = agent_stats["closed_count"] / agent_stats["total_records"] # could introduce NAs
 
 def pricing_accuracy_score(x): return (1 - abs(x - 1)) * 100
-def percentile_score(s): return s.rank(pct=True) * 100
-#def percentile_score(s):
-#    return 100 * (s - s.min()) / (s.max() - s.min())
+#def percentile_score(s): return s.rank(pct=True) * 100
+def percentile_score(s):
+    s = s.astype(float)
+
+    min_val = s.min()
+    max_val = s.max()
+
+    # Case 1: all values identical → give neutral score
+    if pd.isna(min_val) or pd.isna(max_val) or min_val == max_val:
+        return pd.Series(50.0, index=s.index)
+
+    # Case 2: normal min–max scaling
+    return 100 * (s - min_val) / (max_val - min_val)
+
 def score_days_on_market(s): return 100 - s.rank(pct=True) * 100
 
 agent_stats["pricing_accuracy_score"] = agent_stats["avg_pricing_accuracy"].apply(pricing_accuracy_score)
