@@ -207,6 +207,9 @@ if in_range.empty:
 # ---------------------------------------------------------------
 rank_df = in_range.copy()
 
+st.write("DEBUG – columns:", list(rank_df.columns))
+
+
 # Calculate pricing accuracy
 rank_df["pricing_accuracy"] = np.where(
     (rank_df["StandardStatus"] == "Closed") &
