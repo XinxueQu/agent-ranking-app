@@ -61,42 +61,24 @@ if selected_schools:
         st.warning("No data available for the selected school(s).")
         st.stop()
 
-# (c) TIME WINDOW FILTER (CloseDate fallback to ListingContractDate)
+# (c) TIME WINDOW FILTER (based on CloseDate) 
+# Ensure CloseDate is treated as datetime
 
-# Ensure dates are datetime
-filtered["CloseDate"] = pd.to_datetime(filtered.get("CloseDate"), errors="coerce")
+filtered["CloseDate"] = pd.to_datetime(filtered["CloseDate"], errors="coerce") 
+window_options = { "Past 1 Year": 1, "Past 2 Years": 2, "Past 3 Years": 3 } 
+selected_window_label = st.selectbox("⏳ Choose Time Window", list(window_options.keys())) 
 
-# Fallback column (change name if needed)
-if "ListingContractDate" in filtered.columns:
-    filtered["ListingContractDate"] = pd.to_datetime(filtered["ListingContractDate"], errors="coerce")
-else:
-    filtered["ListingContractDate"] = pd.NaT
-
-# Effective date: CloseDate if available, otherwise ListingContractDate
-filtered["effective_date"] = filtered["CloseDate"].fillna(filtered["ListingContractDate"])
-
-window_options = {
-    "Past 1 Year": 1,
-    "Past 2 Years": 2,
-    "Past 3 Years": 3
-}
-
-selected_window_label = st.selectbox("⏳ Choose Time Window", list(window_options.keys()))
-years_back = window_options[selected_window_label]
-
-latest_date = filtered["effective_date"].max()
-cutoff_date = latest_date - pd.DateOffset(years=years_back)
-
-filtered = filtered[filtered["effective_date"] >= cutoff_date]
-
-if filtered.empty:
-    st.warning(f"No records available for the selected time window ({selected_window_label}).")
-    st.stop()
-
-st.info(
-    f"Showing results where CloseDate (or ListingContractDate if missing) ≥ {cutoff_date.date()}"
-)
-
+years_back = window_options[selected_window_label] 
+# Determine the cutoff date (max date in dataset gives more stable behavior) 
+latest_date = filtered["CloseDate"].max() 
+cutoff_date = latest_date - pd.DateOffset(years=years_back) 
+# Apply time filter to the ZIP+School filtered data 
+filtered = filtered[filtered["CloseDate"] >= cutoff_date] 
+if filtered.empty: 
+    st.warning(f"No records available for the selected time window ({selected_window_label}).") 
+    st.stop() 
+    
+st.info(f"Showing results for CloseDate ≥ {cutoff_date.date()} (last {years_back} year(s))")
 
 # (d) Only Look at Resale (not 'New Construction' or 'Updated/Remodeled')
 import ast
