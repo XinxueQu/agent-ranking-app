@@ -309,7 +309,7 @@ agent_stats = agent_stats.sort_values(["Rank", "overall_score"])
 # 🔍 Agent Quality Filters
 # ---------------------------------------------------------------
 
-    if False: 
+if False: 
     st.subheader("🔍 Agent Filters")
     
     col_f1, col_f2 = st.columns(2)
