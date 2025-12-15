@@ -207,7 +207,19 @@ if in_range.empty:
 # ---------------------------------------------------------------
 rank_df = in_range.copy()
 
-st.write("DEBUG – columns:", list(rank_df.columns))
+# Normalize column names (safety)
+rank_df.columns = rank_df.columns.str.strip()
+
+# Force numeric conversion
+for col in ["OriginalListPrice", "TruePrice"]:
+    if col in rank_df.columns:
+        rank_df[col] = (
+            rank_df[col]
+                .astype(str)
+                .str.replace(r"[,$]", "", regex=True)
+                .str.strip()
+        )
+        rank_df[col] = pd.to_numeric(rank_df[col], errors="coerce")
 
 
 # Calculate pricing accuracy
