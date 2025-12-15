@@ -376,19 +376,18 @@ if False:
 st.subheader("🏅 Ranked Agents (interactive)")
 
 
-selected_rows = st.data_editor(
+st.data_editor(
     agent_stats,
     use_container_width=True,
     hide_index=True,
-    #disabled=True,
-    num_rows="dynamic",
+    disabled=True,   # read-only
     column_config={
-    "overall_score": st.column_config.NumberColumn(
-        "Overall Score",
-        format="%.1f",
-        help="Weighted composite score (0–100)"
-    )
-}
+        "overall_score": st.column_config.NumberColumn(
+            "Overall Score",
+            format="%.1f",
+            help="Weighted composite score (0–100)"
+        )
+    }
 )
 
 # ---------------------------------------------------------------
