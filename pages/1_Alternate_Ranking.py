@@ -181,8 +181,9 @@ st.plotly_chart(fig_range, use_container_width=True)
 st.subheader("📄 Listings Within Target Range (Raw Data of Selected Sample)")
 
 in_range = filtered[
-    (filtered["ClosePrice"] >= lower_bound) &
-    (filtered["ClosePrice"] <= upper_bound)
+    ((filtered["ClosePrice"] >= lower_bound) &
+    (filtered["ClosePrice"] <= upper_bound)) |
+    (filtered["ClosePrice"].isna())
 ]
 
 st.write(f"Found **{len(in_range)}** listings within ±1 SD of your target price.")
