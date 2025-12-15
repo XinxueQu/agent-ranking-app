@@ -15,7 +15,6 @@ def load_data():
     return pd.read_csv(url)
 
 data = load_data()
-st.write(data.columns.tolist())
 
 # -------------------- Filters --------------------
 
