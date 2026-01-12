@@ -18,7 +18,9 @@ def load_data():
         "PostalCode","ClosePrice","ElementarySchool","SubdivisionName",
         "CloseDate", "PropertyCondition", "ListingContractDate", "ListAgentDirectPhone"
     ]
-    return pd.read_csv(url, usecols=usecols)
+    #return pd.read_csv(url, usecols=usecols)
+    return pd.read_excel(url, usecols=usecols)
+
 
 data = load_data()
 
