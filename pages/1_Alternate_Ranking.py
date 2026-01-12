@@ -11,7 +11,8 @@ st.write("This page lets you explore price distributions by zipcode and target a
 # -------------------- Load Data --------------------
 @st.cache_data
 def load_data():
-    url = "https://docs.google.com/spreadsheets/d/1UktHniggnt5YMQ_UA8IG9uo_L9PXbcIQ/export?format=csv"
+    #url = "https://docs.google.com/spreadsheets/d/1UktHniggnt5YMQ_UA8IG9uo_L9PXbcIQ/export?format=csv"
+    url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTbCPKp_HwYtE22RjOJLJOvsoGlWWwJ_CJp7Thx41cRiV_pggfzIDBIISmcVC_csSfS3Jlkje_rsst0/pub?gid=501734469&single=true&output=csv" 
     usecols = [
         "ListAgentFullName","is_closed","DaysOnMarket","pricing_accuracy",
         "PostalCode","ClosePrice","ElementarySchool","SubdivisionName",
