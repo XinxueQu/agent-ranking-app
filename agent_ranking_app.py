@@ -55,7 +55,7 @@ def load_data():
         "ListAgentFullName","is_closed","DaysOnMarket","pricing_accuracy",
         "PostalCode","ClosePrice","ElementarySchool","SubdivisionName"
     ]
-    return pd.read_xlsx(url, usecols=usecols)
+    return pd.read_excel(url, usecols=usecols)
 
 data = load_data()
 
