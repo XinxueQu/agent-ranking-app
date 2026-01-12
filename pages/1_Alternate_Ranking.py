@@ -97,6 +97,24 @@ if filtered.empty:
 
 st.info(f"Showing results for CloseDate ≥ {cutoff_date.date()} (last {years_back} year(s))")
 
+# -------------------- Display Effective CloseDate Range --------------------
+valid_dates = filtered["CloseDate"].dropna()
+
+if not valid_dates.empty:
+    min_date = valid_dates.min().date()
+    max_date = valid_dates.max().date()
+
+    st.info(
+        f"📅 **CloseDate range:** {min_date} → {max_date} "
+        f"(based on {selected_window_label})"
+    )
+else:
+    st.info(
+        f"📅 **CloseDate filter tip:** No valid CloseDate values found. "
+        f"Records with missing CloseDate are included."
+    )
+
+
 # (d) Only Look at Resale (not 'New Construction' or 'Updated/Remodeled')
 import ast
 
