@@ -302,25 +302,83 @@ agent_stats["days_on_market_score"]   = score_days_on_market(agent_stats["median
 # ---------------------------------------------------------------
 # Weight inputs
 # ---------------------------------------------------------------
+if False: 
+    st.subheader("⚖️ Scoring Weights")
+
+    col_w1, col_w2, col_w3, col_w4 = st.columns(4)
+    weight_volume = col_w1.number_input("📦 Volume", value=0.4)
+    weight_close  = col_w2.number_input("🔒 Close Rate", value=0.3)
+    weight_days   = col_w3.number_input("⏳ Days on Market", value=0.2)
+    weight_price  = col_w4.number_input("🎯 Pricing Accuracy", value=0.1)
+    
+    total_weight = weight_volume + weight_close + weight_days + weight_price
+    if total_weight == 0:
+        st.error("All weights are zero — cannot rank agents.")
+        st.stop()
+    
+    if total_weight != 1:
+        weight_volume /= total_weight
+        weight_close  /= total_weight
+        weight_days   /= total_weight
+        weight_price  /= total_weight
+        st.info("Weights normalized to sum to 1.")
+
+# ---------------------------------------------------------------
+# ⚖️ Scoring Weights (Seller Priority Presets)
+# ---------------------------------------------------------------
 st.subheader("⚖️ Scoring Weights")
 
-col_w1, col_w2, col_w3, col_w4 = st.columns(4)
-weight_volume = col_w1.number_input("📦 Volume", value=0.4)
-weight_close  = col_w2.number_input("🔒 Close Rate", value=0.3)
-weight_days   = col_w3.number_input("⏳ Days on Market", value=0.2)
-weight_price  = col_w4.number_input("🎯 Pricing Accuracy", value=0.1)
+priority_options = {
+    "Maximizing price (even if it takes longer)": {
+        "close": 0.20,
+        "days": 0.15,
+        "price": 0.40,
+        "volume": 0.25
+    },
+    "Selling efficiently at a fair market price": {
+        "close": 0.25,
+        "days": 0.30,
+        "price": 0.25,
+        "volume": 0.20
+    },
+    "A smooth, predictable closing": {
+        "close": 0.40,
+        "days": 0.20,
+        "price": 0.20,
+        "volume": 0.20
+    },
+    "A low-stress process with clear guidance": {
+        "close": 0.35,
+        "days": 0.15,
+        "price": 0.25,
+        "volume": 0.25
+    }
+}
 
-total_weight = weight_volume + weight_close + weight_days + weight_price
-if total_weight == 0:
-    st.error("All weights are zero — cannot rank agents.")
-    st.stop()
+selected_priority = st.radio(
+    "🎯 Choose your seller priority",
+    options=list(priority_options.keys()),
+    horizontal=False
+)
 
-if total_weight != 1:
-    weight_volume /= total_weight
-    weight_close  /= total_weight
-    weight_days   /= total_weight
-    weight_price  /= total_weight
-    st.info("Weights normalized to sum to 1.")
+weights = priority_options[selected_priority]
+
+weight_close  = weights["close"]
+weight_days   = weights["days"]
+weight_price  = weights["price"]
+weight_volume = weights["volume"]
+
+# Display chosen weights clearly
+st.markdown(
+    f"""
+    **Selected weighting:**
+    - 🔒 Close Rate: **{weight_close:.0%}**
+    - ⏳ Days on Market: **{weight_days:.0%}**
+    - 🎯 Pricing Accuracy: **{weight_price:.0%}**
+    - 📦 Sales Volume: **{weight_volume:.0%}**
+    """
+)
+
 
 # ---------------------------------------------------------------
 # Compute Overall Score
