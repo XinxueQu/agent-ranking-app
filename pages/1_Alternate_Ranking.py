@@ -324,61 +324,65 @@ if False:
         st.info("Weights normalized to sum to 1.")
 
 # ---------------------------------------------------------------
-# ⚖️ Scoring Weights (Seller Priority Presets)
+# ⚖️ Scoring Weights (Seller Priority Selector)
 # ---------------------------------------------------------------
 st.subheader("⚖️ Scoring Weights")
 
 priority_options = {
     "Maximizing price (even if it takes longer)": {
-        "close": 0.20,
-        "days": 0.15,
-        "price": 0.40,
-        "volume": 0.25
+        "Volume": 0.25,
+        "Close Rate": 0.20,
+        "Days on Market": 0.15,
+        "Pricing Accuracy": 0.40
     },
     "Selling efficiently at a fair market price": {
-        "close": 0.25,
-        "days": 0.30,
-        "price": 0.25,
-        "volume": 0.20
+        "Volume": 0.20,
+        "Close Rate": 0.25,
+        "Days on Market": 0.30,
+        "Pricing Accuracy": 0.25
     },
     "A smooth, predictable closing": {
-        "close": 0.40,
-        "days": 0.20,
-        "price": 0.20,
-        "volume": 0.20
+        "Volume": 0.20,
+        "Close Rate": 0.40,
+        "Days on Market": 0.20,
+        "Pricing Accuracy": 0.20
     },
     "A low-stress process with clear guidance": {
-        "close": 0.35,
-        "days": 0.15,
-        "price": 0.25,
-        "volume": 0.25
+        "Volume": 0.25,
+        "Close Rate": 0.35,
+        "Days on Market": 0.15,
+        "Pricing Accuracy": 0.25
     }
 }
 
+# --- Selector (similar UX to agent comparison) ---
 selected_priority = st.selectbox(
-    "🎯 Choose your seller priority",
-    options=list(priority_options.keys()),
-    help="This determines how agents are ranked based on what you value most"
+    "🎯 Choose seller priority",
+    options=list(priority_options.keys())
 )
-
 
 weights = priority_options[selected_priority]
 
-weight_close  = weights["close"]
-weight_days   = weights["days"]
-weight_price  = weights["price"]
-weight_volume = weights["volume"]
+# --- Display weights (read-only, auto-updating) ---
+col1, col2, col3, col4 = st.columns(4)
 
-# Display chosen weights clearly
-st.markdown(
-    f"""
-    **Selected weighting:**
-    - 🔒 Close Rate: **{weight_close:.0%}**
-    - ⏳ Days on Market: **{weight_days:.0%}**
-    - 🎯 Pricing Accuracy: **{weight_price:.0%}**
-    - 📦 Sales Volume: **{weight_volume:.0%}**
-    """
-)
+with col1:
+    st.metric("📦 Volume", f"{weights['Volume']:.2f}")
+
+with col2:
+    st.metric("🔒 Close Rate", f"{weights['Close Rate']:.2f}")
+
+with col3:
+    st.metric("⏳ Days on Market", f"{weights['Days on Market']:.2f}")
+
+with col4:
+    st.metric("🎯 Pricing Accuracy", f"{weights['Pricing Accuracy']:.2f}")
+
+# --- Assign to variables used later ---
+weight_volume = weights["Volume"]
+weight_close  = weights["Close Rate"]
+weight_days   = weights["Days on Market"]
+weight_price  = weights["Pricing Accuracy"]
 
 
 # ---------------------------------------------------------------
