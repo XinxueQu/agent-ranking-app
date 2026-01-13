@@ -138,32 +138,17 @@ filtered = filtered[filtered["PropertyCondition"].apply(is_resale)]
 st.info(f"📊 Sample size after filtering for Resale properties: {len(filtered)}")
 
 
-# -------------------- Percentage of Entire Dataset (Highlighted) --------------------
+# -------------------- Percentage of Entire Dataset --------------------
 total_records_all = len(data)
 selected_records = len(filtered)
 
 if total_records_all > 0:
     pct_selected = selected_records / total_records_all * 100
-
-    st.markdown(
-        f"""
-        <div style="
-            background-color:#fff4e5;
-            border-left:6px solid #ff9800;
-            padding:12px 16px;
-            margin-top:10px;
-            font-size:20px;
-            font-weight:600;
-            border-radius:6px;
-        ">
-        📈 <strong>Coverage:</strong> {selected_records:,} of {total_records_all:,} records<br>
-        <span style="font-size:18px; color:#d35400;">
-            ({pct_selected:.2f}% of entire dataset)
-        </span>
-        </div>
-        """,
-        unsafe_allow_html=True
+    st.caption(
+        f"📈 **Coverage:** {selected_records:,} of {total_records_all:,} records "
+        f"({pct_selected:.2f}% of entire dataset)"
     )
+
 
 
 # -------------------- Visualize Close Price Distribution --------------------
