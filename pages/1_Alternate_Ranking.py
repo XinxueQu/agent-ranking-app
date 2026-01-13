@@ -355,11 +355,12 @@ priority_options = {
     }
 }
 
-selected_priority = st.radio(
+selected_priority = st.selectbox(
     "🎯 Choose your seller priority",
     options=list(priority_options.keys()),
-    horizontal=False
+    help="This determines how agents are ranked based on what you value most"
 )
+
 
 weights = priority_options[selected_priority]
 
