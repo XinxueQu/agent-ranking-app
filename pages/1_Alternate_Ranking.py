@@ -536,13 +536,13 @@ display_cols = [
     "total_records",
     "total_sales",
     "overall_score",
-    "volume_score",
+    #"volume_score",
     "volume_rank",
-    "close_rate_score",
+    #"close_rate_score",
     "close_rate_rank",
-    "days_on_market_score",
+    #"days_on_market_score",
     "days_on_market_rank",
-    "pricing_accuracy_score",
+    #"pricing_accuracy_score",
     "pricing_accuracy_rank"
 ]
 
