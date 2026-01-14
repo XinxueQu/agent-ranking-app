@@ -300,6 +300,33 @@ agent_stats["close_rate_score"]       = percentile_score(agent_stats["close_rate
 agent_stats["days_on_market_score"]   = score_days_on_market(agent_stats["median_days"])
 
 # ---------------------------------------------------------------
+# Convert dimension scores into ranks (1 = best)
+# ---------------------------------------------------------------
+agent_stats["volume_rank"] = (
+    agent_stats["volume_score"]
+    .rank(ascending=False, method="dense")
+    .astype("Int64")
+)
+
+agent_stats["close_rate_rank"] = (
+    agent_stats["close_rate_score"]
+    .rank(ascending=False, method="dense")
+    .astype("Int64")
+)
+
+agent_stats["days_on_market_rank"] = (
+    agent_stats["days_on_market_score"]
+    .rank(ascending=False, method="dense")
+    .astype("Int64")
+)
+
+agent_stats["pricing_accuracy_rank"] = (
+    agent_stats["pricing_accuracy_score"]
+    .rank(ascending=False, method="dense")
+    .astype("Int64")
+)
+
+# ---------------------------------------------------------------
 # Weight inputs
 # ---------------------------------------------------------------
 if False: 
@@ -465,8 +492,26 @@ st.caption(
     f"(min {min_records} listings, min ${min_sales:,.0f} sales)"
 )
 
+
+display_cols = [
+    "Rank",
+    "ListAgentFullName",
+    "ListAgentDirectPhone",
+    "total_records",
+    "total_sales",
+    "overall_score",
+    "volume_score",
+    "volume_rank",
+    "close_rate_score",
+    "close_rate_rank",
+    "days_on_market_score",
+    "days_on_market_rank",
+    "pricing_accuracy_score",
+    "pricing_accuracy_rank"
+]
+
 st.data_editor(
-    filtered_agents,
+    filtered_agents[display_cols],
     use_container_width=True,
     hide_index=True,
     disabled=True,
@@ -474,6 +519,22 @@ st.data_editor(
         "overall_score": st.column_config.NumberColumn(
             "Overall Score",
             format="%.1f"
+        ),
+        "volume_rank": st.column_config.NumberColumn(
+            "📦 Volume Rank",
+            help="Rank based on listing volume (1 = best)"
+        ),
+        "close_rate_rank": st.column_config.NumberColumn(
+            "🔒 Close Rate Rank",
+            help="Rank based on close rate"
+        ),
+        "days_on_market_rank": st.column_config.NumberColumn(
+            "⏳ Days on Market Rank",
+            help="Rank based on speed to close"
+        ),
+        "pricing_accuracy_rank": st.column_config.NumberColumn(
+            "🎯 Pricing Accuracy Rank",
+            help="Rank based on pricing accuracy"
         ),
         "ListAgentDirectPhone": st.column_config.TextColumn(
             "📞 Phone",
