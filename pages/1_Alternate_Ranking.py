@@ -497,7 +497,7 @@ filtered_agents["days_on_market_rank"] = (
 
 filtered_agents["pricing_accuracy_rank"] = (
     filtered_agents["pricing_accuracy_score"]
-    .rank(ascending=False, method="dense")
+    .rank(ascending=True, method="dense")
     .astype("Int64")
 )
 
