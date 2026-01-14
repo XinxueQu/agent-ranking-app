@@ -474,11 +474,30 @@ if filtered_agents.empty:
     st.warning("No agents meet the selected minimum requirements.")
     st.stop()
 
-filtered_agents["Rank"] = (
-    filtered_agents["overall_score"]
-    .rank(ascending=False, method="dense")
-    .astype("Int64")
+# ---------------------------------------------------------------
+# Re-rank agents WITHIN filtered subset (do NOT reuse old ranks)
+# ---------------------------------------------------------------
+filtered_agents = filtered_agents.sort_values(
+    by=[
+        "overall_score",        # primary
+        "total_records",        # tie-breaker 1
+        "close_rate",           # tie-breaker 2
+        "median_days"           # tie-breaker 3 (lower is better)
+    ],
+    ascending=[False, False, False, True]
 )
+
+filtered_agents["Rank"] = (
+    filtered_agents
+    .reset_index(drop=True)
+    .index + 1
+)
+
+#filtered_agents["Rank"] = (
+#    filtered_agents["overall_score"]
+#    .rank(ascending=False, method="dense")
+#    .astype("Int64")
+#)
 
 filtered_agents = filtered_agents.sort_values(
     ["Rank", "overall_score"],
