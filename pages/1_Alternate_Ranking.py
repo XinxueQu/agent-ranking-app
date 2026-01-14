@@ -475,6 +475,34 @@ if filtered_agents.empty:
     st.stop()
 
 # ---------------------------------------------------------------
+# Recompute DIMENSION RANKS within filtered subset
+# ---------------------------------------------------------------
+filtered_agents["volume_rank"] = (
+    filtered_agents["volume_score"]
+    .rank(ascending=False, method="dense")
+    .astype("Int64")
+)
+
+filtered_agents["close_rate_rank"] = (
+    filtered_agents["close_rate_score"]
+    .rank(ascending=False, method="dense")
+    .astype("Int64")
+)
+
+filtered_agents["days_on_market_rank"] = (
+    filtered_agents["days_on_market_score"]
+    .rank(ascending=False, method="dense")
+    .astype("Int64")
+)
+
+filtered_agents["pricing_accuracy_rank"] = (
+    filtered_agents["pricing_accuracy_score"]
+    .rank(ascending=False, method="dense")
+    .astype("Int64")
+)
+
+
+# ---------------------------------------------------------------
 # Re-rank agents WITHIN filtered subset (do NOT reuse old ranks)
 # ---------------------------------------------------------------
 filtered_agents = filtered_agents.sort_values(
