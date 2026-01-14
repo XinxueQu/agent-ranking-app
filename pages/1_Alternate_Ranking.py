@@ -493,17 +493,6 @@ filtered_agents["Rank"] = (
     .index + 1
 )
 
-#filtered_agents["Rank"] = (
-#    filtered_agents["overall_score"]
-#    .rank(ascending=False, method="dense")
-#    .astype("Int64")
-#)
-
-filtered_agents = filtered_agents.sort_values(
-    ["Rank", "overall_score"],
-    ascending=[True, False]
-)
-
 st.subheader("🏅 Ranked Agents (interactive)")
 
 st.caption(
