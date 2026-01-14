@@ -322,7 +322,7 @@ agent_stats["days_on_market_rank"] = (
 
 agent_stats["pricing_accuracy_rank"] = (
     agent_stats["pricing_accuracy_score"]
-    .rank(ascending=False, method="dense")
+    .rank(ascending=True, method="dense")
     .astype("Int64")
 )
 
