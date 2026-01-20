@@ -615,6 +615,26 @@ if not selected_agents:
     st.info("Select one or more agents to view comparison.")
     st.stop()
 
+
+# ---------------------------------------------------------------
+# Invert & normalize pricing accuracy for radar chart ONLY
+# (Higher = better, 0–100)
+# ---------------------------------------------------------------
+pa = agent_stats["pricing_accuracy_score"].astype(float)
+
+# Invert (higher error → lower score)
+pa_inverted = pa.max() - pa
+
+# Normalize to 0–100
+if pa_inverted.max() == pa_inverted.min():
+    agent_stats["pricing_accuracy_score_radar"] = 50.0
+else:
+    agent_stats["pricing_accuracy_score_radar"] = (
+        100 * (pa_inverted - pa_inverted.min()) /
+        (pa_inverted.max() - pa_inverted.min())
+    )
+
+
 # ---------------------------------------------------------------
 # Prepare data for radar chart
 # ---------------------------------------------------------------
@@ -629,7 +649,8 @@ for agent in selected_agents:
         {"Agent": agent, "Dimension": "Volume Score", "Score": row["volume_score"]},
         {"Agent": agent, "Dimension": "Close Rate Score", "Score": row["close_rate_score"]},
         {"Agent": agent, "Dimension": "Days on Market Score", "Score": row["days_on_market_score"]},
-        {"Agent": agent, "Dimension": "Pricing Accuracy Score", "Score": row["pricing_accuracy_score"]},
+        #{"Agent": agent, "Dimension": "Pricing Accuracy Score", "Score": row["pricing_accuracy_score"]},
+        {"Agent": agent, "Dimension": "Pricing Accuracy Score (Inverted)", "Score": row["pricing_accuracy_score_radar"]},
     ])
 
 radar_df = pd.DataFrame(radar_rows)
