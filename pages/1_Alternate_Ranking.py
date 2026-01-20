@@ -615,13 +615,11 @@ if not selected_agents:
     st.info("Select one or more agents to view comparison.")
     st.stop()
 
-
 # ---------------------------------------------------------------
-# Invert & normalize pricing accuracy for radar chart ONLY
-# Normalize within SELECTED agents to improve separation
+# Invert & normalize pricing accuracy
+# Normalized ONLY within selected agents (for radar separation)
 # ---------------------------------------------------------------
 
-# Subset to selected agents
 pa_sel = (
     agent_stats
     .loc[agent_stats["ListAgentFullName"].isin(selected_agents),
@@ -632,21 +630,20 @@ pa_sel = (
 # Invert (higher error → lower score)
 pa_inv_sel = pa_sel.max() - pa_sel
 
-# Normalize to 0–100 WITHIN selected agents
+# Normalize to 0–100 within selected agents
 if pa_inv_sel.max() == pa_inv_sel.min():
-    agent_stats["pricing_accuracy_score_radar"] = 50.0
+    pa_norm_sel = pd.Series(50.0, index=pa_inv_sel.index)
 else:
-    agent_stats["pricing_accuracy_score_radar"] = (
+    pa_norm_sel = (
         100 * (pa_inv_sel - pa_inv_sel.min()) /
         (pa_inv_sel.max() - pa_inv_sel.min())
     )
 
-# Merge back (agents not selected won't be used anyway)
+# Store ONLY for radar use
 agent_stats.loc[
-    agent_stats["ListAgentFullName"].isin(selected_agents),
+    pa_norm_sel.index,
     "pricing_accuracy_score_radar"
-] = agent_stats["pricing_accuracy_score_radar"]
-)
+] = pa_norm_sel
 
 
 # ---------------------------------------------------------------
