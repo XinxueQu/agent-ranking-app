@@ -618,21 +618,35 @@ if not selected_agents:
 
 # ---------------------------------------------------------------
 # Invert & normalize pricing accuracy for radar chart ONLY
-# (Higher = better, 0–100)
+# Normalize within SELECTED agents to improve separation
 # ---------------------------------------------------------------
-pa = agent_stats["pricing_accuracy_score"].astype(float)
+
+# Subset to selected agents
+pa_sel = (
+    agent_stats
+    .loc[agent_stats["ListAgentFullName"].isin(selected_agents),
+         "pricing_accuracy_score"]
+    .astype(float)
+)
 
 # Invert (higher error → lower score)
-pa_inverted = pa.max() - pa
+pa_inv_sel = pa_sel.max() - pa_sel
 
-# Normalize to 0–100
-if pa_inverted.max() == pa_inverted.min():
+# Normalize to 0–100 WITHIN selected agents
+if pa_inv_sel.max() == pa_inv_sel.min():
     agent_stats["pricing_accuracy_score_radar"] = 50.0
 else:
     agent_stats["pricing_accuracy_score_radar"] = (
-        100 * (pa_inverted - pa_inverted.min()) /
-        (pa_inverted.max() - pa_inverted.min())
+        100 * (pa_inv_sel - pa_inv_sel.min()) /
+        (pa_inv_sel.max() - pa_inv_sel.min())
     )
+
+# Merge back (agents not selected won't be used anyway)
+agent_stats.loc[
+    agent_stats["ListAgentFullName"].isin(selected_agents),
+    "pricing_accuracy_score_radar"
+] = agent_stats["pricing_accuracy_score_radar"]
+)
 
 
 # ---------------------------------------------------------------
