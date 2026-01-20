@@ -630,20 +630,22 @@ pa_sel = (
 # Invert (higher error → lower score)
 pa_inv_sel = pa_sel.max() - pa_sel
 
-# Normalize to 0–100 within selected agents
-if pa_inv_sel.max() == pa_inv_sel.min():
-    pa_norm_sel = pd.Series(50.0, index=pa_inv_sel.index)
+# Scale using 0 as min, max(selected) as max
+max_val = pa_inv_sel.max()
+
+if max_val == 0 or pd.isna(max_val):
+    pa_scaled_sel = pd.Series(0.0, index=pa_inv_sel.index)
 else:
-    pa_norm_sel = (
-        100 * (pa_inv_sel - pa_inv_sel.min()) /
-        (pa_inv_sel.max() - pa_inv_sel.min())
-    )
+    pa_scaled_sel = 100 * pa_inv_sel / max_val
+    # ↑ keep multiplier if you still want a 0–100-ish scale
+    # ↓ OR remove *100 if you want raw 0–max units
+    # pa_scaled_sel = pa_inv_sel
 
 # Store ONLY for radar use
 agent_stats.loc[
-    pa_norm_sel.index,
+    pa_scaled_sel.index,
     "pricing_accuracy_score_radar"
-] = pa_norm_sel
+] = pa_scaled_sel
 
 
 # ---------------------------------------------------------------
