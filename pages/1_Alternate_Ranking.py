@@ -677,9 +677,10 @@ fig_radar = px.line_polar(
     theta="Dimension",
     color="Agent",
     line_close=True,
-    range_r=[0, 100],
+    range_r=[0, pa_scaled_sel.max()],
     title="Performance Comparison Across Dimensions"
 )
+
 
 st.plotly_chart(fig_radar, use_container_width=True)
 
