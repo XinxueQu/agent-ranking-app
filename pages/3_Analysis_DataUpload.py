@@ -1,261 +1,193 @@
-import streamlit as st
+import ast
+
 import pandas as pd
-import numpy as np
 import plotly.express as px
-import plotly.graph_objects as go
+import streamlit as st
 
-st.set_page_config(page_title="Uploaded Dataset Ranking", layout="wide")
-st.title("📁 Uploaded Dataset Ranking")
-st.caption("Upload your own dataset, then run the same ranking analysis used in the main app.")
+st.set_page_config(page_title="3_xxx", layout="wide")
 
-REQUIRED_COLUMNS = [
-    "ListAgentFullName",
-    "is_closed",
-    "DaysOnMarket",
-    "pricing_accuracy",
-    "PostalCode",
-    "ClosePrice",
-    "ElementarySchool",
-    "SubdivisionName",
-]
+st.title("🧪 Alternate Ranking Page (Upload Version)")
+st.write("Upload a file and explore price distributions by zipcode with a target range based on standard deviation.")
 
 
-def pricing_accuracy_score(x):
-    return (1 - abs(x - 1)) * 100
+@st.cache_data
+def load_uploaded_data(uploaded_file):
+    if uploaded_file.name.lower().endswith(".csv"):
+        return pd.read_csv(uploaded_file)
+    return pd.read_excel(uploaded_file)
 
 
-def percentile_score(s):
-    return s.rank(pct=True) * 100
-
-
-def score_days_on_market(s):
-    return 100 - s.rank(pct=True) * 100
-
-
-def get_norm(df: pd.DataFrame, row: pd.Series, col: str, invert: bool = False) -> float:
-    if col not in df.columns:
-        return np.nan
-    s = pd.to_numeric(df[col], errors="coerce")
-    x = pd.to_numeric(row.get(col, np.nan), errors="coerce")
-    vmin, vmax = np.nanmin(s.values), np.nanmax(s.values)
-    if np.isnan(x) or np.isnan(vmin) or np.isnan(vmax):
-        return np.nan
-    if vmax == vmin:
-        return 50.0
-    val = (x - vmin) / (vmax - vmin)
-    if invert:
-        val = 1.0 - val
-    return float(np.clip(val * 100.0, 0, 100))
-
-
-def build_agent_summary(df: pd.DataFrame) -> pd.DataFrame:
-    agent_summary = (
-        df.groupby("ListAgentFullName", dropna=False)
-        .agg(
-            total_records=("ListAgentFullName", "count"),
-            total_sales=("ClosePrice", "sum"),
-            closed_count=("is_closed", "sum"),
-            closed_daysonmarket_mean=(
-                "DaysOnMarket",
-                lambda x: x[df.loc[x.index, "is_closed"]].mean(),
-            ),
-            closed_daysonmarket_median=(
-                "DaysOnMarket",
-                lambda x: x[df.loc[x.index, "is_closed"]].median(),
-            ),
-            avg_pricing_accuracy=("pricing_accuracy", "mean"),
-        )
-        .reset_index()
-    )
-    agent_summary["close_rate"] = agent_summary["closed_count"] / agent_summary["total_records"]
-    agent_summary["pricing_accuracy_score"] = agent_summary["avg_pricing_accuracy"].apply(
-        pricing_accuracy_score
-    )
-    agent_summary["sales_score"] = percentile_score(agent_summary["total_sales"])
-    agent_summary["volume_score"] = percentile_score(agent_summary["total_records"])
-    agent_summary["close_rate_score"] = percentile_score(agent_summary["close_rate"])
-    agent_summary["avg_days_on_mkt_score"] = score_days_on_market(
-        agent_summary["closed_daysonmarket_mean"]
-    )
-    agent_summary["median_days_on_mkt_score"] = score_days_on_market(
-        agent_summary["closed_daysonmarket_median"]
-    )
-    return agent_summary
-
-
-uploaded_file = st.file_uploader(
-    "Upload CSV or Excel file",
-    type=["csv", "xlsx", "xls"],
-    help="Dataset must contain the same columns as the default source.",
-)
+st.subheader("📤 Upload Data")
+uploaded_file = st.file_uploader("Upload CSV or Excel file", type=["csv", "xlsx", "xls"])
 
 if not uploaded_file:
-    st.info("Upload a file to begin.")
+    st.info("Please upload a file to continue.")
     st.stop()
 
 try:
-    if uploaded_file.name.lower().endswith(".csv"):
-        data = pd.read_csv(uploaded_file)
-    else:
-        data = pd.read_excel(uploaded_file)
+    data = load_uploaded_data(uploaded_file)
 except Exception as exc:
     st.error(f"Unable to read file: {exc}")
     st.stop()
 
-missing_columns = [c for c in REQUIRED_COLUMNS if c not in data.columns]
-if missing_columns:
-    st.error(
-        "Uploaded file is missing required columns: " + ", ".join(missing_columns)
+required_columns = [
+    "PostalCode",
+    "ClosePrice",
+    "CloseDate",
+    "PropertyCondition",
+]
+missing = [c for c in required_columns if c not in data.columns]
+
+if missing:
+    st.error(f"Missing required columns: {', '.join(missing)}")
+    st.stop()
+
+# -------------------- Filters --------------------
+st.subheader("📍 Choose Zipcodes")
+zip_options = sorted(data["PostalCode"].dropna().astype(str).unique())
+zipcodes = st.multiselect("Select Zipcode(s)", options=zip_options)
+
+if not zipcodes:
+    st.info("Please select at least one zipcode to proceed.")
+    st.stop()
+
+filtered = data[data["PostalCode"].astype(str).isin(zipcodes)].copy()
+if filtered.empty:
+    st.warning("No data found for selected zipcodes.")
+    st.stop()
+
+# Optional school filter
+if "ElementarySchool" in filtered.columns:
+    st.subheader("🏫 Elementary School (Optional)")
+    school_list = sorted(filtered["ElementarySchool"].dropna().astype(str).unique())
+    selected_schools = st.multiselect(
+        "Choose Elementary School(s) — leave empty to include all",
+        options=school_list,
     )
+    if selected_schools:
+        filtered = filtered[filtered["ElementarySchool"].astype(str).isin(selected_schools)]
+        if filtered.empty:
+            st.warning("No data available for the selected school(s).")
+            st.stop()
+
+# CloseDate cleanup + window filter
+filtered["CloseDate"] = (
+    filtered["CloseDate"].astype(str).str.strip().replace(["", "None", "nan"], pd.NA)
+)
+filtered["CloseDate"] = pd.to_datetime(filtered["CloseDate"], errors="coerce")
+
+window_options = {"Past 1 Year": 1, "Past 2 Years": 2, "Past 3 Years": 3}
+selected_window_label = st.selectbox("⏳ Choose Time Window", list(window_options.keys()))
+years_back = window_options[selected_window_label]
+
+latest_date = filtered["CloseDate"].max()
+if pd.isna(latest_date):
+    st.warning("No valid CloseDate values found for selected filters.")
     st.stop()
 
-data = data[REQUIRED_COLUMNS].copy()
-agent_summary = build_agent_summary(data)
+cutoff_date = latest_date - pd.DateOffset(years=years_back)
+filtered = filtered[(filtered["CloseDate"] >= cutoff_date) | (filtered["CloseDate"].isna())]
 
-with st.form("upload_filters_and_weights"):
-    left_col, right_col = st.columns([2, 1])
-
-    with left_col:
-        st.subheader("📍 Filter Listings")
-        zip_options = sorted(data["PostalCode"].dropna().astype(str).unique())
-        zipcodes = st.multiselect("Zipcode(s)", options=zip_options)
-        min_price = st.number_input("Minimum Price", value=0)
-        max_price = st.number_input("Maximum Price", value=1_000_000)
-        elementary = st.text_input("Elementary School")
-        subdivision = st.text_input("Subdivision")
-        min_volume = st.number_input("Minimum Total Transactions", value=0)
-        min_median_close = st.number_input("Minimum Median Close Price", value=100_000)
-        max_median_close = st.number_input("Maximum Median Close Price", value=1_000_000)
-
-    with right_col:
-        st.subheader("⚖️ Scoring Weights")
-        weight_volume = st.number_input("Transaction Volume", value=0.5, key="up_w_vol")
-        weight_close = st.number_input("Close Rate", value=0.3, key="up_w_close")
-        weight_days = st.number_input("Days on Market", value=0.2, key="up_w_days")
-        weight_price = st.number_input("Pricing Accuracy", value=0.0, key="up_w_price")
-
-    submitted = st.form_submit_button("Run Rankings")
-
-if not submitted:
-    st.info("Configure filters and click Run Rankings.")
+if filtered.empty:
+    st.warning(f"No records available for the selected time window ({selected_window_label}).")
     st.stop()
 
-total_weight = weight_volume + weight_close + weight_days + weight_price
-if total_weight <= 0:
-    st.error("All weights are zero. Please adjust.")
+st.info(f"Showing results for CloseDate ≥ {cutoff_date.date()} (last {years_back} year(s))")
+
+# Resale-only filter (supports list/string-list/raw string)
+def is_resale(value):
+    if isinstance(value, list):
+        return bool(value) and value[0] == "Resale"
+    if isinstance(value, str):
+        stripped = value.strip()
+        if stripped == "Resale":
+            return True
+        try:
+            parsed = ast.literal_eval(stripped)
+            return isinstance(parsed, list) and bool(parsed) and parsed[0] == "Resale"
+        except Exception:
+            return False
+    return False
+
+st.info(f"📊 Sample size BEFORE filtering for Resale properties: {len(filtered)}")
+filtered = filtered[filtered["PropertyCondition"].apply(is_resale)]
+st.info(f"📊 Sample size after filtering for Resale properties: {len(filtered)}")
+
+if filtered.empty:
+    st.warning("No resale records available after filtering.")
     st.stop()
-if total_weight != 1:
-    st.warning("Weights do not sum to 1. Normalizing automatically.")
-    weight_volume /= total_weight
-    weight_close /= total_weight
-    weight_days /= total_weight
-    weight_price /= total_weight
 
-scored = agent_summary.copy()
-scored["overall_score"] = (
-    weight_volume * scored["volume_score"]
-    + weight_close * scored["close_rate_score"]
-    + weight_days * scored["median_days_on_mkt_score"]
-    + weight_price * scored["pricing_accuracy_score"]
+# Numeric close price cleanup
+filtered["ClosePrice"] = (
+    filtered["ClosePrice"].astype(str).str.replace(r"[,$]", "", regex=True).str.strip()
 )
+filtered["ClosePrice"] = pd.to_numeric(filtered["ClosePrice"], errors="coerce")
+filtered = filtered.dropna(subset=["ClosePrice"])
 
-df_filtered = data.copy()
-if zipcodes:
-    z_set = {str(z).strip() for z in zipcodes}
-    df_filtered = df_filtered[df_filtered["PostalCode"].astype(str).str.strip().isin(z_set)]
+if filtered.empty:
+    st.warning("No valid ClosePrice values available after cleaning.")
+    st.stop()
 
-df_filtered = df_filtered[(df_filtered["ClosePrice"] >= min_price) & (df_filtered["ClosePrice"] <= max_price)]
-if elementary:
-    df_filtered = df_filtered[df_filtered["ElementarySchool"] == elementary]
-if subdivision:
-    df_filtered = df_filtered[df_filtered["SubdivisionName"] == subdivision]
-
-median_close = (
-    df_filtered.groupby("ListAgentFullName", dropna=False)["ClosePrice"]
-    .median()
-    .reset_index(name="Median Close Price")
+# -------------------- Visualize Close Price Distribution --------------------
+st.subheader("📊 Close Price Distribution")
+fig_hist = px.histogram(
+    filtered,
+    x="ClosePrice",
+    nbins=30,
+    title="Distribution of Close Prices",
+    labels={"ClosePrice": "Close Price"},
 )
+st.plotly_chart(fig_hist, use_container_width=True)
 
-valid_agents = median_close[
-    (median_close["Median Close Price"] >= min_median_close)
-    & (median_close["Median Close Price"] <= max_median_close)
-]["ListAgentFullName"]
+# -------------------- Target Price + Std Dev --------------------
+st.subheader("🎯 Choose a Target Price (via slider)")
 
-df_filtered = df_filtered[df_filtered["ListAgentFullName"].isin(valid_agents)]
+min_price = int(filtered["ClosePrice"].min())
+max_price = int(filtered["ClosePrice"].max())
+mean_price = filtered["ClosePrice"].mean()
+sample_std = filtered["ClosePrice"].std()
 
-filtered_agent_counts = (
-    df_filtered.groupby("ListAgentFullName", dropna=False).size().reset_index(name="n")
-)
-filtered_agent_counts = filtered_agent_counts.merge(
-    median_close, on="ListAgentFullName", how="left"
-)
-filtered_agent_counts_selected = filtered_agent_counts[filtered_agent_counts["n"] >= min_volume]
-
-selected_agents = (
-    scored[scored["ListAgentFullName"].isin(filtered_agent_counts_selected["ListAgentFullName"].unique())]
-    .merge(
-        filtered_agent_counts_selected[["ListAgentFullName", "Median Close Price"]],
-        on="ListAgentFullName",
-        how="left",
+if min_price == max_price:
+    target_price = min_price
+    st.info(f"Only one close price value is available: ${target_price:,.0f}")
+else:
+    step_size = max(1, min(5000, int((max_price - min_price) / 200)))
+    target_price = st.slider(
+        "Select Target Close Price",
+        min_value=min_price,
+        max_value=max_price,
+        value=int(mean_price),
+        step=step_size,
+        help="Select a target price. We will compute ± standard deviation around it.",
     )
-    .sort_values(by="overall_score", ascending=False)
+
+std_width = st.slider(
+    "📏 Select width (multiples of standard deviation)",
+    min_value=0.1,
+    max_value=2.0,
+    value=1.0,
+    step=0.1,
 )
 
-if selected_agents.empty:
-    st.warning("No agents matched your filters.")
-    st.stop()
+if pd.isna(sample_std) or sample_std == 0:
+    lower_bound = upper_bound = target_price
+else:
+    lower_bound = target_price - std_width * sample_std
+    upper_bound = target_price + std_width * sample_std
 
-rankings_tab, dimensions_tab = st.tabs(["🏆 Rankings", "📐 Multi-dimension view"])
+st.write(f"**Price Range:** ${lower_bound:,.0f} – ${upper_bound:,.0f} (± {std_width} × std dev)")
 
-with rankings_tab:
-    tbl = selected_agents.copy()
-    tbl["Rank"] = tbl["overall_score"].rank(ascending=False, method="dense").astype(int)
-    tbl["Close Rate Rank"] = tbl["close_rate"].rank(ascending=False, method="dense").astype(int)
-    tbl["Days on Market Rank"] = tbl["closed_daysonmarket_median"].rank(
-        ascending=True, method="dense"
-    ).astype(int)
-    tbl["Pricing Accuracy Rank"] = tbl["avg_pricing_accuracy"].rank(
-        ascending=False, method="dense"
-    ).astype(int)
+fig_range = px.histogram(
+    filtered,
+    x="ClosePrice",
+    nbins=30,
+    title="Close Price Distribution with Target Range Highlighted",
+)
+fig_range.add_vrect(x0=lower_bound, x1=upper_bound, fillcolor="green", opacity=0.25, line_width=0)
+st.plotly_chart(fig_range, use_container_width=True)
 
-    final_cols = [
-        "Rank",
-        "ListAgentFullName",
-        "overall_score",
-        "Median Close Price",
-        "total_sales",
-        "closed_count",
-        "close_rate",
-        "closed_daysonmarket_median",
-        "avg_pricing_accuracy",
-        "Close Rate Rank",
-        "Days on Market Rank",
-        "Pricing Accuracy Rank",
-    ]
-    st.dataframe(tbl[final_cols], use_container_width=True)
-
-with dimensions_tab:
-    options = selected_agents["ListAgentFullName"].dropna().astype(str).sort_values().unique().tolist()
-    agent_to_view = st.selectbox("Choose an agent", options=options)
-    row = selected_agents.loc[selected_agents["ListAgentFullName"] == agent_to_view].iloc[0]
-
-    dims = {
-        "Volume": get_norm(selected_agents, row, "volume_score"),
-        "Close Rate": get_norm(selected_agents, row, "close_rate_score"),
-        "Days on Market": get_norm(selected_agents, row, "closed_daysonmarket_median", invert=True),
-        "Total Sales": get_norm(selected_agents, row, "sales_score"),
-    }
-    dim_df = pd.DataFrame({"Dimension": list(dims.keys()), "Score": list(dims.values())}).dropna()
-
-    if len(dim_df) >= 3:
-        r = dim_df["Score"].tolist()
-        theta = dim_df["Dimension"].tolist()
-        fig_radar = go.Figure(data=go.Scatterpolar(r=r + [r[0]], theta=theta + [theta[0]], fill="toself"))
-        fig_radar.update_layout(
-            polar=dict(radialaxis=dict(range=[0, 100], showticklabels=True)),
-            showlegend=False,
-        )
-        st.plotly_chart(fig_radar, use_container_width=True)
-
-    fig_bar = px.bar(dim_df, x="Dimension", y="Score", range_y=[0, 100])
-    st.plotly_chart(fig_bar, use_container_width=True)
+# -------------------- Show Listings Inside the Range --------------------
+st.subheader("📄 Listings Within Target Range")
+in_range = filtered[(filtered["ClosePrice"] >= lower_bound) & (filtered["ClosePrice"] <= upper_bound)]
+st.write(f"Found **{len(in_range)}** listings within the selected range.")
+st.dataframe(in_range, use_container_width=True)
