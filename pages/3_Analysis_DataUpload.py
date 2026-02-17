@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-st.set_page_config(page_title="3_xxx", layout="wide")
+st.set_page_config(page_title="Analysis with Data Upload", layout="wide")
 
 st.title("🧪 Alternate Ranking Page (Upload Version)")
 st.write("Upload a file and explore price distributions by zipcode with a target range based on standard deviation.")
