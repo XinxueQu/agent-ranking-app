@@ -229,13 +229,15 @@ m8.metric(
     "Agents in Selected Zip",
     f"{zip_agents_count:,}" if zip_agents_count is not None else "—",
 )
+school_text = f"Schools: {school_agents_count:,}" if school_agents_count is not None else "Schools: —"
+subdivision_text = (
+    f"Subdivisions: {subdivision_agents_count:,}"
+    if subdivision_agents_count is not None
+    else "Subdivisions: —"
+)
 m9.metric(
     "Agents in Selected School/Subdivision",
-    (
-        f"Schools: {school_agents_count:,} | Subdivisions: {subdivision_agents_count:,}"
-        if (school_agents_count is not None or subdivision_agents_count is not None)
-        else "—"
-    ),
+    f"{school_text} | {subdivision_text}",
 )
 
 # ---------------- Price distribution + range ----------------
