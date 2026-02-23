@@ -63,8 +63,31 @@ def score_days_on_market(series: pd.Series) -> pd.Series:
     return 100 - series.rank(pct=True) * 100
 
 
-def to_top_percent_value(scores: pd.Series) -> pd.Series:
-    return (scores.rank(pct=True, ascending=False, method="max") * 100).round(2)
+def to_top_percent_bucket(scores: pd.Series) -> pd.Series:
+    s = pd.to_numeric(scores, errors="coerce")
+
+    # Best scores get the smallest percentile number (e.g., 0.2%),
+    # and ties take the BEST rank within the tie group.
+    top_pct = s.rank(pct=True, ascending=False, method="min") * 100
+
+    def bucket(p: float) -> str:
+        if p <= 1:
+            return "Top 1%"
+        if p <= 3:
+            return "Top 3%"
+        if p <= 5:
+            return "Top 5%"
+        if p <= 10:
+            return "Top 10%"
+        if p <= 20:
+            return "Top 20%"
+        if p <= 30:
+            return "Top 30%"
+        if p <= 50:
+            return "Top 50%"
+        return "Top 100%"
+
+    return top_pct.apply(bucket)
 
 data = load_data().copy()
 
@@ -298,14 +321,14 @@ agent_stats = agent_stats.sort_values(
     ascending=[False, False, False, True],
 )
 
-agent_stats["Tier"] = to_top_percent_value(agent_stats["overall_score"])
+agent_stats["Tier"] = to_top_percent_bucket(agent_stats["overall_score"])
 # Reuse the same metric definitions as 1_Alternate_Ranking.py for performance tiers.
-agent_stats["Volume Tier"] = to_top_percent_value(agent_stats["volume_score"])
-agent_stats["Close Rate Tier"] = to_top_percent_value(agent_stats["close_rate_score"])
-agent_stats["Median Days on Market Tier"] = to_top_percent_value(agent_stats["days_on_market_median_score"])
-agent_stats["Mean Days on Market Tier"] = to_top_percent_value(agent_stats["days_on_market_mean_score"])
-agent_stats["Total Sales Tier"] = to_top_percent_value(agent_stats["total_sales_score"])
-agent_stats["Pricing Accuracy Tier"] = to_top_percent_value(-agent_stats["avg_pricing_accuracy"])
+agent_stats["Volume Tier"] = to_top_percent_bucket(agent_stats["volume_score"])
+agent_stats["Close Rate Tier"] = to_top_percent_bucket(agent_stats["close_rate_score"])
+agent_stats["Median Days on Market Tier"] = to_top_percent_bucket(agent_stats["days_on_market_median_score"])
+agent_stats["Mean Days on Market Tier"] = to_top_percent_bucket(agent_stats["days_on_market_mean_score"])
+agent_stats["Total Sales Tier"] = to_top_percent_bucket(agent_stats["total_sales_score"])
+agent_stats["Pricing Accuracy Tier"] = to_top_percent_bucket(-agent_stats["avg_pricing_accuracy"])
 
 # Ranking/top10: DO tie breaking via sort keys
 agent_stats = agent_stats.sort_values(
@@ -382,12 +405,12 @@ st.data_editor(
         "ListAgentFullName": "Agent",
         "ListAgentDirectPhone": st.column_config.TextColumn("📞 Phone"),
         "overall_score": st.column_config.NumberColumn("Overall Score", format="%.1f"),
-        "Volume Tier": st.column_config.NumberColumn("Volume Top %", format="%.2f"),
-        "Close Rate Tier": st.column_config.NumberColumn("Close Rate Top %", format="%.2f"),
-        "Median Days on Market Tier": st.column_config.NumberColumn("Median DOM Top %", format="%.2f"),
-        "Mean Days on Market Tier": st.column_config.NumberColumn("Mean DOM Top %", format="%.2f"),
-        "Total Sales Tier": st.column_config.NumberColumn("Total Sales Top %", format="%.2f"),
-        "Pricing Accuracy Tier": st.column_config.NumberColumn("Pricing Accuracy Top %", format="%.2f"),
+        "Volume Tier": "Volume Tier",
+        "Close Rate Tier": "Close Rate Tier",
+        "Median Days on Market Tier": "Median DOM Tier",
+        "Mean Days on Market Tier": "Mean DOM Tier",
+        "Total Sales Tier": "Total Sales Tier",
+        "Pricing Accuracy Tier": "Pricing Accuracy Tier",
     },
 )
 
@@ -420,11 +443,11 @@ st.dataframe(
         "sales_count_selected_zip": "Sales Count (Selected Zip)",
         "sales_count_selected_school": "Sales Count (Selected Elementary School)",
         "total_sales_m": st.column_config.NumberColumn("Total Sales (M$)", format="%.2f"),
-        "Volume Tier": st.column_config.NumberColumn("Volume Top %", format="%.2f"),
-        "Close Rate Tier": st.column_config.NumberColumn("Close Rate Top %", format="%.2f"),
-        "Mean Days on Market Tier": st.column_config.NumberColumn("Mean DOM Top %", format="%.2f"),
-        "Median Days on Market Tier": st.column_config.NumberColumn("Median DOM Top %", format="%.2f"),
-        "Pricing Accuracy Tier": st.column_config.NumberColumn("Pricing Accuracy Top %", format="%.2f"),
-        "Total Sales Tier": st.column_config.NumberColumn("Total Sales Top %", format="%.2f"),
+        "Volume Tier": "Volume Tier",
+        "Close Rate Tier": "Close Rate Tier",
+        "Mean Days on Market Tier": "Mean DOM Tier",
+        "Median Days on Market Tier": "Median DOM Tier",
+        "Pricing Accuracy Tier": "Pricing Accuracy Tier",
+        "Total Sales Tier": "Total Sales Tier",
     },
 )
