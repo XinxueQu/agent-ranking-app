@@ -75,9 +75,13 @@ def to_top_percent_bucket(scores: pd.Series) -> pd.Series:
             return "Top 20%"
         if p <= 30:
             return "Top 30%"
-        if p <= 50:
-            return "Top 50%"
-        return "Top 100%"
+        if p <= 60:
+            return "Top 60%"
+        if p <= 70:
+            return "Top 70%"
+        if p <= 80:
+            return "Top 80%"
+        return "Top 90%"
 
     return pct_rank.apply(bucket)
 
@@ -317,15 +321,15 @@ agent_stats["Volume Tier"] = to_top_percent_bucket(agent_stats["total_transactio
 
 # Top 10 final table
 final_top10 = agent_stats.head(10).copy()
-final_top10["total_sales_m"] = final_top10["total_sales"] / 1_000_000
 
 st.subheader("🏆 Final Top 10 Agents")
-st.caption("Top agents based on selected filters and weighted score.")
+st.caption("Top agents based on selected filters and weighted score. Tiers are computed across all filtered agents before selecting top 10.")
 
 final_cols = [
-    "Tier",
     "ListAgentFullName",
     "ListAgentDirectPhone",
+    "total_transactions",
+    "total_sales",
     "Volume Tier",
     "Close Rate Tier",
     "Mean DOM Tier",
@@ -341,13 +345,14 @@ st.data_editor(
     column_config={
         "ListAgentFullName": "Agent",
         "ListAgentDirectPhone": st.column_config.TextColumn("📞 Phone"),
+        "total_transactions": st.column_config.NumberColumn("Transactions"),
+        "total_sales": st.column_config.NumberColumn("Total Sales ($)", format="$%.0f"),
     },
 )
 
 st.subheader("📋 Selected Agent Performance Details")
 detail_cols = [
     "ListAgentFullName",
-    "Tier",
     "Volume Tier",
     "Close Rate Tier",
     "Mean DOM Tier",
