@@ -46,6 +46,11 @@ st.set_page_config(
 )
 st.markdown("<h1 style='text-align: center; color: darkblue;'>🏡 Top Real Estate Agent Rankings</h1>", unsafe_allow_html=True)
 
+# Optional quick nav to the Top-10 page in multi-page mode
+if hasattr(st.sidebar, "page_link"):
+    st.sidebar.page_link("pages/4_Top10_Agents.py", label="🏅 Top 10 Agents", icon="🏅")
+
+
 # -------------------- Load data (CSV is faster) --------------------
 @st.cache_data
 def load_data():
