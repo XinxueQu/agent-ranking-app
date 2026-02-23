@@ -89,19 +89,22 @@ for num_col in ["ClosePrice", "DaysOnMarket", "pricing_accuracy", "is_closed"]:
     data[num_col] = pd.to_numeric(data[num_col], errors="coerce")
 
 data["CloseDate"] = pd.to_datetime(data["CloseDate"], errors="coerce")
+data["ListingContractDate"] = pd.to_datetime(data["ListingContractDate"], errors="coerce")
 data["City"] = data["City"].astype(str).str.strip()
 data["PostalCode"] = data["PostalCode"].astype(str).str.strip()
+# Use listing date for active/unclosed records and close date for closed records.
+data["ActivityDate"] = data["CloseDate"].fillna(data["ListingContractDate"])
 
 st.subheader("📍 Geographic Selection")
 
 cities = sorted([x for x in data["City"].dropna().unique() if x and x.lower() != "nan"])
-selected_city = st.selectbox("City (required)", options=["Select a city"] + cities, index=0)
+selected_cities = st.multiselect("City (required, choose one or more)", options=cities)
 
-if selected_city == "Select a city":
-    st.info("Please choose a City to continue.")
+if not selected_cities:
+    st.info("Please choose at least one City to continue.")
     st.stop()
 
-geo_filtered = data[data["City"] == selected_city].copy()
+geo_filtered = data[data["City"].isin(selected_cities)].copy()
 
 zip_options = sorted([x for x in geo_filtered["PostalCode"].dropna().unique() if x and x.lower() != "nan"])
 selected_zips = st.multiselect("Zip Code (optional)", options=zip_options)
@@ -121,14 +124,14 @@ if geo_filtered.empty:
 
 st.subheader("⏳ Time Window")
 selected_years = st.selectbox("Years to look back", options=[1, 2, 3], index=0)
-latest_date = geo_filtered["CloseDate"].max()
+latest_date = geo_filtered["ActivityDate"].max()
 
 if pd.isna(latest_date):
-    st.warning("No valid CloseDate values in selected geography.")
+    st.warning("No valid listing/close dates in selected geography.")
     st.stop()
 
 cutoff_date = latest_date - pd.DateOffset(years=int(selected_years))
-window_filtered = geo_filtered[geo_filtered["CloseDate"] >= cutoff_date].copy()
+window_filtered = geo_filtered[geo_filtered["ActivityDate"] >= cutoff_date].copy()
 
 if window_filtered.empty:
     st.warning("No records in this geography and lookback window.")
@@ -211,7 +214,7 @@ agent_stats = (
     .agg(
         total_transactions=("ListAgentFullName", "count"),
         total_sales=("ClosePrice", "sum"),
-        closed_count=("is_closed", "sum"),
+        closed_count=("is_closed", lambda x: (pd.to_numeric(x, errors="coerce") == 1).sum()),
         mean_days_on_market=("DaysOnMarket", "mean"),
         median_days_on_market=("DaysOnMarket", "median"),
         avg_pricing_accuracy=("pricing_accuracy", "mean"),
@@ -236,8 +239,10 @@ min_tx = int(agent_stats["total_transactions"].min())
 max_tx = int(agent_stats["total_transactions"].max())
 
 f1, f2 = st.columns(2)
-selected_min_tx = f1.number_input("Minimum transactions", min_value=min_tx, max_value=max_tx, value=min_tx, step=1)
-selected_max_tx = f2.number_input("Maximum transactions", min_value=min_tx, max_value=max_tx, value=max_tx, step=1)
+selected_min_tx = f1.number_input("Minimum transactions", min_value=0, value=min_tx, step=1)
+selected_max_tx = f2.number_input(
+    "Maximum transactions", min_value=selected_min_tx, value=max(max_tx, selected_min_tx), step=1
+)
 
 if selected_min_tx > selected_max_tx:
     st.error("Minimum transactions cannot exceed maximum transactions.")
@@ -304,6 +309,11 @@ agent_stats = agent_stats.sort_values(
 )
 
 agent_stats["Tier"] = to_top_percent_bucket(agent_stats["overall_score"])
+agent_stats["Close Rate Tier"] = to_top_percent_bucket(agent_stats["close_rate"])
+agent_stats["Mean DOM Tier"] = to_top_percent_bucket(-agent_stats["mean_days_on_market"])
+agent_stats["Median DOM Tier"] = to_top_percent_bucket(-agent_stats["median_days_on_market"])
+agent_stats["Pricing Accuracy Tier"] = to_top_percent_bucket(agent_stats["pricing_accuracy_score"])
+agent_stats["Volume Tier"] = to_top_percent_bucket(agent_stats["total_transactions"])
 
 # Top 10 final table
 final_top10 = agent_stats.head(10).copy()
@@ -316,12 +326,11 @@ final_cols = [
     "Tier",
     "ListAgentFullName",
     "ListAgentDirectPhone",
-    "total_transactions",
-    "total_sales_m",
-    "close_rate",
-    "mean_days_on_market",
-    "median_days_on_market",
-    "avg_pricing_accuracy",
+    "Volume Tier",
+    "Close Rate Tier",
+    "Mean DOM Tier",
+    "Median DOM Tier",
+    "Pricing Accuracy Tier",
 ]
 
 st.data_editor(
@@ -332,12 +341,6 @@ st.data_editor(
     column_config={
         "ListAgentFullName": "Agent",
         "ListAgentDirectPhone": st.column_config.TextColumn("📞 Phone"),
-        "total_transactions": st.column_config.NumberColumn("Transactions"),
-        "total_sales_m": st.column_config.NumberColumn("Total Sales (M$)", format="%.2f"),
-        "close_rate": st.column_config.NumberColumn("Close Rate", format="%.2f"),
-        "mean_days_on_market": st.column_config.NumberColumn("Mean DOM", format="%.1f"),
-        "median_days_on_market": st.column_config.NumberColumn("Median DOM", format="%.1f"),
-        "avg_pricing_accuracy": st.column_config.NumberColumn("Avg Pricing Accuracy", format="%.3f"),
     },
 )
 
@@ -345,6 +348,11 @@ st.subheader("📋 Selected Agent Performance Details")
 detail_cols = [
     "ListAgentFullName",
     "Tier",
+    "Volume Tier",
+    "Close Rate Tier",
+    "Mean DOM Tier",
+    "Median DOM Tier",
+    "Pricing Accuracy Tier",
     "total_transactions",
     "closed_count",
     "close_rate",
