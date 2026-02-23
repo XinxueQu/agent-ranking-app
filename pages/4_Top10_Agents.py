@@ -196,37 +196,51 @@ summary_avg_dom = window_filtered["DaysOnMarket"].mean()
 summary_avg_close_rate = window_filtered["is_closed"].mean()
 summary_avg_pricing_accuracy = window_filtered["pricing_accuracy"].mean()
 
-# Agent counts by selected geography scopes (if selected)
-city_agents_count = data[data["City"].isin(selected_cities)]["ListAgentFullName"].nunique()
+# Agent counts by selected geography scopes, all using the SAME scoped window (window_filtered)
+city_agents_count = window_filtered["ListAgentFullName"].nunique()
 zip_agents_count = (
-    data[data["PostalCode"].isin(selected_zips)]["ListAgentFullName"].nunique()
+    window_filtered[window_filtered["PostalCode"].isin(selected_zips)]["ListAgentFullName"].nunique()
     if selected_zips
     else None
 )
 school_agents_count = (
-    data[data["ElementarySchool"].isin(selected_schools)]["ListAgentFullName"].nunique()
+    window_filtered[window_filtered["ElementarySchool"].isin(selected_schools)]["ListAgentFullName"].nunique()
     if selected_schools
     else None
 )
 subdivision_agents_count = (
-    data[data["CleanedSubdivision"].isin(selected_subdivisions)]["ListAgentFullName"].nunique()
+    window_filtered[window_filtered["CleanedSubdivision"].isin(selected_subdivisions)]["ListAgentFullName"].nunique()
     if selected_subdivisions
     else None
+)
+
+region_label_parts = [f"City={', '.join(selected_cities)}"]
+if selected_zips:
+    region_label_parts.append(f"Zip={', '.join(selected_zips)}")
+if selected_schools:
+    region_label_parts.append(f"School={', '.join(map(str, selected_schools))}")
+if selected_subdivisions:
+    region_label_parts.append(f"Subdivision={', '.join(map(str, selected_subdivisions))}")
+
+st.caption(
+    "Scope: "
+    + " | ".join(region_label_parts)
+    + f" | Time Window: Past {selected_years} year(s) from latest activity date | Property: Resale only"
 )
 
 m1, m2, m3 = st.columns(3)
 m4, m5, m6 = st.columns(3)
 m7, m8, m9 = st.columns(3)
 
-m1.metric("Total Agents", f"{summary_total_agents:,}")
-m2.metric(f"Transactions (Past {selected_years}y)", f"{summary_total_transactions:,}")
-m3.metric("Total Sales (M$)", f"{summary_total_sales_m:,.2f}")
-m4.metric("Avg Days on Market", f"{summary_avg_dom:,.1f}")
-m5.metric("Avg Close Rate", f"{summary_avg_close_rate:.1%}")
-m6.metric("Avg Pricing Accuracy", f"{summary_avg_pricing_accuracy:,.3f}")
-m7.metric("Agents in Selected City", f"{city_agents_count:,}")
+m1.metric("Total Agents (Scoped)", f"{summary_total_agents:,}")
+m2.metric(f"Transactions (Scoped, Past {selected_years}y)", f"{summary_total_transactions:,}")
+m3.metric("Total Sales (Scoped, M$)", f"{summary_total_sales_m:,.2f}")
+m4.metric("Avg Days on Market (Scoped)", f"{summary_avg_dom:,.1f}")
+m5.metric("Avg Close Rate (Scoped)", f"{summary_avg_close_rate:.1%}")
+m6.metric("Avg Pricing Accuracy (Scoped)", f"{summary_avg_pricing_accuracy:,.3f}")
+m7.metric("Agents in Selected City (Scoped)", f"{city_agents_count:,}")
 m8.metric(
-    "Agents in Selected Zip",
+    "Agents in Selected Zip (Scoped)",
     f"{zip_agents_count:,}" if zip_agents_count is not None else "—",
 )
 school_text = f"Schools: {school_agents_count:,}" if school_agents_count is not None else "Schools: —"
@@ -236,7 +250,7 @@ subdivision_text = (
     else "Subdivisions: —"
 )
 m9.metric(
-    "Agents in Selected School/Subdivision",
+    "Agents in Selected School/Subdivision (Scoped)",
     f"{school_text} | {subdivision_text}",
 )
 
