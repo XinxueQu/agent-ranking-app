@@ -196,8 +196,27 @@ summary_avg_dom = window_filtered["DaysOnMarket"].mean()
 summary_avg_close_rate = window_filtered["is_closed"].mean()
 summary_avg_pricing_accuracy = window_filtered["pricing_accuracy"].mean()
 
+# Agent counts by selected geography scopes (if selected)
+city_agents_count = data[data["City"].isin(selected_cities)]["ListAgentFullName"].nunique()
+zip_agents_count = (
+    data[data["PostalCode"].isin(selected_zips)]["ListAgentFullName"].nunique()
+    if selected_zips
+    else None
+)
+school_agents_count = (
+    data[data["ElementarySchool"].isin(selected_schools)]["ListAgentFullName"].nunique()
+    if selected_schools
+    else None
+)
+subdivision_agents_count = (
+    data[data["CleanedSubdivision"].isin(selected_subdivisions)]["ListAgentFullName"].nunique()
+    if selected_subdivisions
+    else None
+)
+
 m1, m2, m3 = st.columns(3)
 m4, m5, m6 = st.columns(3)
+m7, m8, m9 = st.columns(3)
 
 m1.metric("Total Agents", f"{summary_total_agents:,}")
 m2.metric(f"Transactions (Past {selected_years}y)", f"{summary_total_transactions:,}")
@@ -205,6 +224,19 @@ m3.metric("Total Sales (M$)", f"{summary_total_sales_m:,.2f}")
 m4.metric("Avg Days on Market", f"{summary_avg_dom:,.1f}")
 m5.metric("Avg Close Rate", f"{summary_avg_close_rate:.1%}")
 m6.metric("Avg Pricing Accuracy", f"{summary_avg_pricing_accuracy:,.3f}")
+m7.metric("Agents in Selected City", f"{city_agents_count:,}")
+m8.metric(
+    "Agents in Selected Zip",
+    f"{zip_agents_count:,}" if zip_agents_count is not None else "—",
+)
+m9.metric(
+    "Agents in Selected School/Subdivision",
+    (
+        f"Schools: {school_agents_count:,} | Subdivisions: {subdivision_agents_count:,}"
+        if (school_agents_count is not None or subdivision_agents_count is not None)
+        else "—"
+    ),
+)
 
 # ---------------- Price distribution + range ----------------
 st.subheader("💰 Price Distribution & Range")
@@ -224,11 +256,12 @@ std_price = float(window_filtered["ClosePrice"].std())
 
 step_size = max(1000, min(5000, int((max_price - min_price) / 200) if max_price > min_price else 1000))
 
+target_price_default = min(max(1_000_000, min_price), max_price)
 target_price = st.slider(
     "Target price",
     min_value=min_price,
     max_value=max_price,
-    value=mean_price,
+    value=target_price_default,
     step=step_size,
 )
 
@@ -236,7 +269,7 @@ std_width = st.slider(
     "Price band width (standard deviations)",
     min_value=0.1,
     max_value=2.0,
-    value=1.0,
+    value=0.5,
     step=0.1,
 )
 
