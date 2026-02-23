@@ -89,7 +89,6 @@ def to_top_percent_bucket(scores: pd.Series) -> pd.Series:
 
     return pct_rank.apply(bucket)
 
-
 data = load_data().copy()
 
 # Ensure numeric/date columns are properly typed
@@ -239,7 +238,8 @@ agent_stats["pricing_accuracy_score"] = agent_stats["avg_pricing_accuracy"].appl
 agent_stats["volume_score"] = percentile_score(agent_stats["total_transactions"])
 agent_stats["sales_score"] = percentile_score(agent_stats["total_sales"])
 agent_stats["close_rate_score"] = percentile_score(agent_stats["close_rate"])
-agent_stats["days_on_market_score"] = score_days_on_market(agent_stats["median_days_on_market"])
+agent_stats["days_on_market_median_score"] = score_days_on_market(agent_stats["median_days_on_market"])
+agent_stats["days_on_market_mean_score"] = score_days_on_market(agent_stats["mean_days_on_market"])
 agent_stats["total_sales_score"] = percentile_score(agent_stats["total_sales"])
 
 # ---------------- Filters: min/max transaction count ----------------
@@ -310,7 +310,7 @@ wc4.metric("🎯 Pricing Accuracy", f"{weights['Pricing Accuracy']:.2f}")
 agent_stats["overall_score"] = (
     weights["Volume"] * agent_stats["volume_score"]
     + weights["Close Rate"] * agent_stats["close_rate_score"]
-    + weights["Days on Market"] * agent_stats["days_on_market_score"]
+    + weights["Days on Market"] * agent_stats["days_on_market_median_score"]
     + weights["Pricing Accuracy"] * agent_stats["pricing_accuracy_score"]
 )
 
@@ -324,9 +324,10 @@ agent_stats["Tier"] = to_top_percent_bucket(agent_stats["overall_score"])
 # Reuse the same metric definitions as 1_Alternate_Ranking.py for performance tiers.
 agent_stats["Volume Tier"] = to_top_percent_bucket(agent_stats["volume_score"])
 agent_stats["Close Rate Tier"] = to_top_percent_bucket(agent_stats["close_rate_score"])
-agent_stats["Days on Market Tier"] = to_top_percent_bucket(agent_stats["days_on_market_score"])
+agent_stats["Median Days on Market Tier"] = to_top_percent_bucket(agent_stats["days_on_market_median_score"])
+agent_stats["Mean Days on Market Tier"] = to_top_percent_bucket(agent_stats["days_on_market_mean_score"])
 agent_stats["Total Sales Tier"] = to_top_percent_bucket(agent_stats["total_sales_score"])
-agent_stats["Pricing Accuracy Tier"] = to_top_percent_bucket(agent_stats["pricing_accuracy_score"])
+agent_stats["Pricing Accuracy Tier"] = to_top_percent_bucket(-agent_stats["avg_pricing_accuracy"])
 
 # Ranking/top10: DO tie breaking via sort keys
 agent_stats = agent_stats.sort_values(
@@ -350,7 +351,8 @@ final_cols = [
     "overall_score",
     "Volume Tier",
     "Close Rate Tier",
-    "Days on Market Tier",
+    "Median Days on Market Tier",
+    "Mean Days on Market Tier",
     "Total Sales Tier",
     "Pricing Accuracy Tier",
 ]
@@ -371,16 +373,17 @@ st.data_editor(
 st.subheader("📋 Selected Agent Performance Details")
 detail_cols = [
     "ListAgentFullName",
-    "Volume Tier",
-    "Close Rate Tier",
-    "Days on Market Tier",
-    "Pricing Accuracy Tier",
     "total_transactions",
-    "closed_count",
+    "Volume Tier",
     "close_rate",
+    "Close Rate Tier",
     "mean_days_on_market",
+    "Mean Days on Market Tier",
     "median_days_on_market",
+    "Median Days on Market Tier",
     "avg_pricing_accuracy",
+    "Pricing Accuracy Tier",
     "total_sales",
+    "Total Sales Tier",
 ]
 st.dataframe(final_top10[detail_cols], use_container_width=True)
