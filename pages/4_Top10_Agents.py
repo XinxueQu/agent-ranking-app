@@ -46,6 +46,35 @@ def is_resale(value) -> bool:
     return False
 
 
+def clean_subdivision_name(value: str) -> str:
+    text = str(value or "")
+
+    replacements = [
+        (" 01", ""), (" 02", ""), (" 03", ""), (" 04", ""), (" 05", ""),
+        (" 06", ""), (" 07", ""), (" 08", ""), (" 09", ""), (" 10", ""),
+        (" 0", ""), (" 1", ""), (" 2", ""), (" 3", ""), (" 4", ""), (" 5", ""),
+        (" 6", ""), (" 7", ""), (" 8", ""), (" 9", ""), ("0", ""), ("1", ""),
+        ("2", ""), ("3", ""), ("4", ""), ("5", ""), ("6", ""), ("7", ""),
+        ("8", ""), ("9", ""), ("&", ""),
+        (" Ph", ""), (" Div ", ""), (" Resub", ""), (" Pud", ""), (" Inc", ""),
+        (" Creeksec", " Creek"), (" Surv", ","), (" Annex", ","), (" Amd", ""),
+        (" Add", ""), (" Sec", ""), ("-", " "), ("  ", ""), (" Blk", ""),
+        (" Instl", " "), (" Phs", ""), (" Unit", ""), (" Subd", ""),
+        (" Abc Mid Dec", ""), (" Tr D", ""), (" The", ""), (" aka ", ""),
+        ("Town Center", "Towncenter,"), ("Condos", "Condo"), ("Enfield", "Enfield,"),
+        ("Riviera Spgs", "Riviera Springs,"), ("Crk", "Creek,"), ("Brykerwoods", "Brykerwoods,"),
+        ("Town-", "Town,"), ("Villagesec", "Village"), ("Sun City", "Sun City,"),
+        ("Pemberton Heights", "Pemberton Heights,"), ("Rosedale", "Rosedale,"),
+    ]
+
+    for find_text, replacement_text in replacements:
+        text = text.replace(find_text, replacement_text)
+
+    # normalize spacing
+    text = " ".join(text.split())
+    return text.strip()
+
+
 def percentile_score(series: pd.Series) -> pd.Series:
     series = series.astype(float)
     min_val = series.min()
@@ -99,6 +128,7 @@ data["CloseDate"] = pd.to_datetime(data["CloseDate"], errors="coerce")
 data["ListingContractDate"] = pd.to_datetime(data["ListingContractDate"], errors="coerce")
 data["City"] = data["City"].astype(str).str.strip()
 data["PostalCode"] = data["PostalCode"].astype(str).str.strip()
+data["CleanedSubdivision"] = data["SubdivisionName"].fillna("").astype(str).apply(clean_subdivision_name)
 # Use listing date for active/unclosed records and close date for closed records.
 data["ActivityDate"] = data["CloseDate"].fillna(data["ListingContractDate"])
 
@@ -124,6 +154,13 @@ school_options = sorted(
 selected_schools = st.multiselect("Elementary School (optional)", options=school_options)
 if selected_schools:
     geo_filtered = geo_filtered[geo_filtered["ElementarySchool"].isin(selected_schools)]
+
+subdivision_options = sorted(
+    [x for x in geo_filtered["CleanedSubdivision"].dropna().unique() if str(x).strip() and str(x).lower() != "nan"]
+)
+selected_subdivisions = st.multiselect("Subdivision (optional)", options=subdivision_options)
+if selected_subdivisions:
+    geo_filtered = geo_filtered[geo_filtered["CleanedSubdivision"].isin(selected_subdivisions)]
 
 if geo_filtered.empty:
     st.warning("No records found for the selected geographic filters.")
