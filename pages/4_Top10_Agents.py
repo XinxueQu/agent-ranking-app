@@ -332,9 +332,7 @@ agent_stats = agent_stats.sort_values(
     ascending=[False, False, False, False, True],
 )
 
-final_top10 = agent_stats.head(10).copy()
-# Top 10 final table
-final_top10 = agent_stats.head(10).copy()
+final_top10 = agent_stats.head(100).copy()
 
 st.subheader("🏆 Final Top 10 Agents")
 st.caption("Top agents based on selected filters and weighted score. Tiers are computed across all filtered agents before selecting top 10.")
