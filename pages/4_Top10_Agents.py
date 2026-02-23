@@ -240,6 +240,7 @@ agent_stats["volume_score"] = percentile_score(agent_stats["total_transactions"]
 agent_stats["sales_score"] = percentile_score(agent_stats["total_sales"])
 agent_stats["close_rate_score"] = percentile_score(agent_stats["close_rate"])
 agent_stats["days_on_market_score"] = score_days_on_market(agent_stats["median_days_on_market"])
+agent_stats["total_sales_score"] = percentile_score(agent_stats["total_sales"])
 
 # ---------------- Filters: min/max transaction count ----------------
 st.subheader("🔍 Agent Filters")
@@ -324,6 +325,7 @@ agent_stats["Tier"] = to_top_percent_bucket(agent_stats["overall_score"])
 agent_stats["Volume Tier"] = to_top_percent_bucket(agent_stats["volume_score"])
 agent_stats["Close Rate Tier"] = to_top_percent_bucket(agent_stats["close_rate_score"])
 agent_stats["Days on Market Tier"] = to_top_percent_bucket(agent_stats["days_on_market_score"])
+agent_stats["Total Sales Tier"] = to_top_percent_bucket(agent_stats["total_sales_score"])
 agent_stats["Pricing Accuracy Tier"] = to_top_percent_bucket(agent_stats["pricing_accuracy_score"])
 
 # Ranking/top10: DO tie breaking via sort keys
@@ -332,19 +334,24 @@ agent_stats = agent_stats.sort_values(
     ascending=[False, False, False, False, True],
 )
 
-final_top10 = agent_stats.head(100).copy()
+final_top10 = agent_stats.head(10).copy()
+final_top10["Rank"] = (
+    final_top10["overall_score"].rank(ascending=False, method="dense").astype("Int64")
+)
+final_top10 = final_top10.sort_values(["Rank", "overall_score"], ascending=[True, False])
 
 st.subheader("🏆 Final Top 10 Agents")
 st.caption("Top agents based on selected filters and weighted score. Tiers are computed across all filtered agents before selecting top 10.")
 
 final_cols = [
+    "Rank",
     "ListAgentFullName",
     "ListAgentDirectPhone",
-    "total_transactions",
-    "total_sales",
+    "overall_score",
     "Volume Tier",
     "Close Rate Tier",
     "Days on Market Tier",
+    "Total Sales Tier",
     "Pricing Accuracy Tier",
 ]
 
@@ -354,10 +361,10 @@ st.data_editor(
     hide_index=True,
     disabled=True,
     column_config={
+        "Rank": st.column_config.NumberColumn("Rank"),
         "ListAgentFullName": "Agent",
         "ListAgentDirectPhone": st.column_config.TextColumn("📞 Phone"),
-        "total_transactions": st.column_config.NumberColumn("Transactions"),
-        "total_sales": st.column_config.NumberColumn("Total Sales ($)", format="$%.0f"),
+        "overall_score": st.column_config.NumberColumn("Overall Score", format="%.1f"),
     },
 )
 
