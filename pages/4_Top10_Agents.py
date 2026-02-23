@@ -374,37 +374,18 @@ agent_stats = agent_stats.sort_values(
 agent_stats["Tier"] = to_top_percent_bucket(agent_stats["overall_score"])
 # Percentiles + tiers (ties broken deterministically)
 tie_cols = ["ListAgentFullName", "total_transactions", "total_sales"]
+# Tiers: NO tie break
+agent_stats = add_percentile_and_tier(agent_stats, "total_transactions", "Volume Percentile", "Volume Tier", True, None)
+agent_stats = add_percentile_and_tier(agent_stats, "close_rate", "Close Rate Percentile", "Close Rate Tier", True, None)
+agent_stats = add_percentile_and_tier(agent_stats, "median_days_on_market", "Median DOM Percentile", "Median DOM Tier", False, None)
 
-agent_stats = add_percentile_and_tier(
-    agent_stats, "total_transactions",
-    out_pct_col="Volume Percentile", out_tier_col="Volume Tier",
-    higher_is_better=True, tie_break_cols=tie_cols
+# Ranking/top10: DO tie breaking via sort keys
+agent_stats = agent_stats.sort_values(
+    by=["overall_score", "total_transactions", "total_sales", "close_rate", "median_days_on_market"],
+    ascending=[False, False, False, False, True],
 )
 
-agent_stats = add_percentile_and_tier(
-    agent_stats, "close_rate",
-    out_pct_col="Close Rate Percentile", out_tier_col="Close Rate Tier",
-    higher_is_better=True, tie_break_cols=tie_cols
-)
-
-agent_stats = add_percentile_and_tier(
-    agent_stats, "mean_days_on_market",
-    out_pct_col="Mean DOM Percentile", out_tier_col="Mean DOM Tier",
-    higher_is_better=False, tie_break_cols=tie_cols
-)
-
-agent_stats = add_percentile_and_tier(
-    agent_stats, "median_days_on_market",
-    out_pct_col="Median DOM Percentile", out_tier_col="Median DOM Tier",
-    higher_is_better=False, tie_break_cols=tie_cols
-)
-
-agent_stats = add_percentile_and_tier(
-    agent_stats, "pricing_accuracy_score",
-    out_pct_col="Pricing Accuracy Percentile", out_tier_col="Pricing Accuracy Tier",
-    higher_is_better=True, tie_break_cols=tie_cols
-)
-
+final_top10 = agent_stats.head(10).copy()
 # Top 10 final table
 final_top10 = agent_stats.head(10).copy()
 
