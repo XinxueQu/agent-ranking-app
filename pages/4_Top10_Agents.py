@@ -85,7 +85,63 @@ def to_top_percent_bucket(scores: pd.Series) -> pd.Series:
 
     return pct_rank.apply(bucket)
 
+def add_percentile_and_tier(
+    df: pd.DataFrame,
+    value_col: str,
+    out_pct_col: str,
+    out_tier_col: str,
+    higher_is_better: bool = True,
+    tie_break_cols: list[str] | None = None,
+) -> pd.DataFrame:
+    """
+    Adds:
+      - out_pct_col: percentile score 0..100 (higher = better)
+      - out_tier_col: "Top X%" bucket based on that percentile
 
+    Tie-breaking:
+      We add tiny deterministic noise based on tie_break_cols to avoid identical ranks.
+    """
+    s = pd.to_numeric(df[value_col], errors="coerce").fillna(np.nan)
+
+    # Flip if lower is better (e.g., days on market)
+    if not higher_is_better:
+        s = -s
+
+    # Deterministic tie-breaker noise
+    if tie_break_cols:
+        # Build a stable per-row numeric key from tie-break columns
+        key = (
+            df[tie_break_cols]
+            .astype(str)
+            .agg("|".join, axis=1)
+            .apply(lambda x: abs(hash(x)) % 1_000_000)
+            .astype(float)
+        )
+        noise = (key / 1_000_000) * 1e-6  # very tiny
+        s_adj = s + noise
+    else:
+        s_adj = s
+
+    # Percentile score: 0..100 where higher = better
+    pct = s_adj.rank(pct=True, ascending=True, method="average") * 100
+    df[out_pct_col] = pct
+
+    # Convert percentile to "Top X%" where smaller top% is better
+    top_pct = 100 - df[out_pct_col]
+
+    def bucket(p: float) -> str:
+        if p <= 1: return "Top 1%"
+        if p <= 3: return "Top 3%"
+        if p <= 5: return "Top 5%"
+        if p <= 10: return "Top 10%"
+        if p <= 20: return "Top 20%"
+        if p <= 30: return "Top 30%"
+        if p <= 50: return "Top 50%"
+        return "Top 100%"
+
+    df[out_tier_col] = top_pct.apply(bucket)
+    return df
+    
 data = load_data().copy()
 
 # Ensure numeric/date columns are properly typed
@@ -261,6 +317,9 @@ if agent_stats.empty:
     st.warning("No agents match the selected transaction range.")
     st.stop()
 
+st.subheader("👥 Filtered Agent Count")
+st.metric("Agents matching current filters", f"{agent_stats['ListAgentFullName'].nunique():,}")
+
 # ---------------- Weights ----------------
 st.subheader("⚖️ Scoring Weights")
 priority_options = {
@@ -313,11 +372,38 @@ agent_stats = agent_stats.sort_values(
 )
 
 agent_stats["Tier"] = to_top_percent_bucket(agent_stats["overall_score"])
-agent_stats["Close Rate Tier"] = to_top_percent_bucket(agent_stats["close_rate"])
-agent_stats["Mean DOM Tier"] = to_top_percent_bucket(-agent_stats["mean_days_on_market"])
-agent_stats["Median DOM Tier"] = to_top_percent_bucket(-agent_stats["median_days_on_market"])
-agent_stats["Pricing Accuracy Tier"] = to_top_percent_bucket(agent_stats["pricing_accuracy_score"])
-agent_stats["Volume Tier"] = to_top_percent_bucket(agent_stats["total_transactions"])
+# Percentiles + tiers (ties broken deterministically)
+tie_cols = ["ListAgentFullName", "total_transactions", "total_sales"]
+
+agent_stats = add_percentile_and_tier(
+    agent_stats, "total_transactions",
+    out_pct_col="Volume Percentile", out_tier_col="Volume Tier",
+    higher_is_better=True, tie_break_cols=tie_cols
+)
+
+agent_stats = add_percentile_and_tier(
+    agent_stats, "close_rate",
+    out_pct_col="Close Rate Percentile", out_tier_col="Close Rate Tier",
+    higher_is_better=True, tie_break_cols=tie_cols
+)
+
+agent_stats = add_percentile_and_tier(
+    agent_stats, "mean_days_on_market",
+    out_pct_col="Mean DOM Percentile", out_tier_col="Mean DOM Tier",
+    higher_is_better=False, tie_break_cols=tie_cols
+)
+
+agent_stats = add_percentile_and_tier(
+    agent_stats, "median_days_on_market",
+    out_pct_col="Median DOM Percentile", out_tier_col="Median DOM Tier",
+    higher_is_better=False, tie_break_cols=tie_cols
+)
+
+agent_stats = add_percentile_and_tier(
+    agent_stats, "pricing_accuracy_score",
+    out_pct_col="Pricing Accuracy Percentile", out_tier_col="Pricing Accuracy Tier",
+    higher_is_better=True, tie_break_cols=tie_cols
+)
 
 # Top 10 final table
 final_top10 = agent_stats.head(10).copy()
