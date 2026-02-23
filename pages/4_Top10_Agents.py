@@ -63,31 +63,8 @@ def score_days_on_market(series: pd.Series) -> pd.Series:
     return 100 - series.rank(pct=True) * 100
 
 
-def to_top_percent_bucket(scores: pd.Series) -> pd.Series:
-    pct_rank = scores.rank(pct=True, ascending=False, method="max") * 100
-
-    def bucket(p: float) -> str:
-        if p <= 1:
-            return "Top 1%"
-        if p <= 3:
-            return "Top 3%"
-        if p <= 5:
-            return "Top 5%"
-        if p <= 10:
-            return "Top 10%"
-        if p <= 20:
-            return "Top 20%"
-        if p <= 30:
-            return "Top 30%"
-        if p <= 60:
-            return "Top 60%"
-        if p <= 70:
-            return "Top 70%"
-        if p <= 80:
-            return "Top 80%"
-        return "Top 90%"
-
-    return pct_rank.apply(bucket)
+def to_top_percent_value(scores: pd.Series) -> pd.Series:
+    return (scores.rank(pct=True, ascending=False, method="max") * 100).round(2)
 
 data = load_data().copy()
 
@@ -221,7 +198,7 @@ agent_stats = (
     .agg(
         total_transactions=("ListAgentFullName", "count"),
         total_sales=("ClosePrice", "sum"),
-        closed_count=("is_closed", lambda x: (pd.to_numeric(x, errors="coerce") == 1).sum()),
+        closed_count=("is_closed", "sum"),
         mean_days_on_market=("DaysOnMarket", "mean"),
         median_days_on_market=("DaysOnMarket", "median"),
         avg_pricing_accuracy=("pricing_accuracy", "mean"),
@@ -233,6 +210,7 @@ agent_stats = (
     .reset_index()
 )
 
+# Derived metrics
 agent_stats["close_rate"] = agent_stats["closed_count"] / agent_stats["total_transactions"]
 agent_stats["pricing_accuracy_score"] = agent_stats["avg_pricing_accuracy"].apply(pricing_accuracy_score)
 agent_stats["volume_score"] = percentile_score(agent_stats["total_transactions"])
@@ -320,14 +298,14 @@ agent_stats = agent_stats.sort_values(
     ascending=[False, False, False, True],
 )
 
-agent_stats["Tier"] = to_top_percent_bucket(agent_stats["overall_score"])
+agent_stats["Tier"] = to_top_percent_value(agent_stats["overall_score"])
 # Reuse the same metric definitions as 1_Alternate_Ranking.py for performance tiers.
-agent_stats["Volume Tier"] = to_top_percent_bucket(agent_stats["volume_score"])
-agent_stats["Close Rate Tier"] = to_top_percent_bucket(agent_stats["close_rate_score"])
-agent_stats["Median Days on Market Tier"] = to_top_percent_bucket(agent_stats["days_on_market_median_score"])
-agent_stats["Mean Days on Market Tier"] = to_top_percent_bucket(agent_stats["days_on_market_mean_score"])
-agent_stats["Total Sales Tier"] = to_top_percent_bucket(agent_stats["total_sales_score"])
-agent_stats["Pricing Accuracy Tier"] = to_top_percent_bucket(-agent_stats["avg_pricing_accuracy"])
+agent_stats["Volume Tier"] = to_top_percent_value(agent_stats["volume_score"])
+agent_stats["Close Rate Tier"] = to_top_percent_value(agent_stats["close_rate_score"])
+agent_stats["Median Days on Market Tier"] = to_top_percent_value(agent_stats["days_on_market_median_score"])
+agent_stats["Mean Days on Market Tier"] = to_top_percent_value(agent_stats["days_on_market_mean_score"])
+agent_stats["Total Sales Tier"] = to_top_percent_value(agent_stats["total_sales_score"])
+agent_stats["Pricing Accuracy Tier"] = to_top_percent_value(-agent_stats["avg_pricing_accuracy"])
 
 # Ranking/top10: DO tie breaking via sort keys
 agent_stats = agent_stats.sort_values(
@@ -340,6 +318,43 @@ final_top10["Rank"] = (
     final_top10["overall_score"].rank(ascending=False, method="dense").astype("Int64")
 )
 final_top10 = final_top10.sort_values(["Rank", "overall_score"], ascending=[True, False])
+final_top10["total_sales_m"] = (final_top10["total_sales"] / 1_000_000).round(2)
+
+# Agent sales count context (within selected years)
+years_filtered_all = data[data["ActivityDate"] >= cutoff_date].copy()
+years_filtered_city = years_filtered_all[years_filtered_all["City"].isin(selected_cities)].copy()
+
+sales_count_all_map = years_filtered_all.groupby("ListAgentFullName", dropna=False)["is_closed"].sum()
+sales_count_city_map = years_filtered_city.groupby("ListAgentFullName", dropna=False)["is_closed"].sum()
+
+if selected_zips:
+    years_filtered_zip = years_filtered_city[years_filtered_city["PostalCode"].isin(selected_zips)].copy()
+    sales_count_zip_map = years_filtered_zip.groupby("ListAgentFullName", dropna=False)["is_closed"].sum()
+else:
+    sales_count_zip_map = None
+
+if selected_schools:
+    years_filtered_school = years_filtered_city[years_filtered_city["ElementarySchool"].isin(selected_schools)].copy()
+    sales_count_school_map = years_filtered_school.groupby("ListAgentFullName", dropna=False)["is_closed"].sum()
+else:
+    sales_count_school_map = None
+
+final_top10["sales_count_all_years"] = final_top10["ListAgentFullName"].map(sales_count_all_map).fillna(0).astype(int)
+final_top10["sales_count_selected_cities"] = final_top10["ListAgentFullName"].map(sales_count_city_map).fillna(0).astype(int)
+
+if sales_count_zip_map is None:
+    final_top10["sales_count_selected_zip"] = pd.NA
+else:
+    final_top10["sales_count_selected_zip"] = (
+        final_top10["ListAgentFullName"].map(sales_count_zip_map).fillna(0).astype(int)
+    )
+
+if sales_count_school_map is None:
+    final_top10["sales_count_selected_school"] = pd.NA
+else:
+    final_top10["sales_count_selected_school"] = (
+        final_top10["ListAgentFullName"].map(sales_count_school_map).fillna(0).astype(int)
+    )
 
 st.subheader("🏆 Final Top 10 Agents")
 st.caption("Top agents based on selected filters and weighted score. Tiers are computed across all filtered agents before selecting top 10.")
@@ -367,12 +382,22 @@ st.data_editor(
         "ListAgentFullName": "Agent",
         "ListAgentDirectPhone": st.column_config.TextColumn("📞 Phone"),
         "overall_score": st.column_config.NumberColumn("Overall Score", format="%.1f"),
+        "Volume Tier": st.column_config.NumberColumn("Volume Top %", format="%.2f"),
+        "Close Rate Tier": st.column_config.NumberColumn("Close Rate Top %", format="%.2f"),
+        "Median Days on Market Tier": st.column_config.NumberColumn("Median DOM Top %", format="%.2f"),
+        "Mean Days on Market Tier": st.column_config.NumberColumn("Mean DOM Top %", format="%.2f"),
+        "Total Sales Tier": st.column_config.NumberColumn("Total Sales Top %", format="%.2f"),
+        "Pricing Accuracy Tier": st.column_config.NumberColumn("Pricing Accuracy Top %", format="%.2f"),
     },
 )
 
 st.subheader("📋 Selected Agent Performance Details")
 detail_cols = [
     "ListAgentFullName",
+    "sales_count_all_years",
+    "sales_count_selected_cities",
+    "sales_count_selected_zip",
+    "sales_count_selected_school",
     "total_transactions",
     "Volume Tier",
     "close_rate",
@@ -383,7 +408,23 @@ detail_cols = [
     "Median Days on Market Tier",
     "avg_pricing_accuracy",
     "Pricing Accuracy Tier",
-    "total_sales",
+    "total_sales_m",
     "Total Sales Tier",
 ]
-st.dataframe(final_top10[detail_cols], use_container_width=True)
+st.dataframe(
+    final_top10[detail_cols],
+    use_container_width=True,
+    column_config={
+        "sales_count_all_years": "Sales Count (All Data, Selected Years)",
+        "sales_count_selected_cities": "Sales Count (Selected Cities)",
+        "sales_count_selected_zip": "Sales Count (Selected Zip)",
+        "sales_count_selected_school": "Sales Count (Selected Elementary School)",
+        "total_sales_m": st.column_config.NumberColumn("Total Sales (M$)", format="%.2f"),
+        "Volume Tier": st.column_config.NumberColumn("Volume Top %", format="%.2f"),
+        "Close Rate Tier": st.column_config.NumberColumn("Close Rate Top %", format="%.2f"),
+        "Mean Days on Market Tier": st.column_config.NumberColumn("Mean DOM Top %", format="%.2f"),
+        "Median Days on Market Tier": st.column_config.NumberColumn("Median DOM Top %", format="%.2f"),
+        "Pricing Accuracy Tier": st.column_config.NumberColumn("Pricing Accuracy Top %", format="%.2f"),
+        "Total Sales Tier": st.column_config.NumberColumn("Total Sales Top %", format="%.2f"),
+    },
+)
