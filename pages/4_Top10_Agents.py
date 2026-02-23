@@ -1,4 +1,39 @@
-@@ -37,133 +37,80 @@ def load_data() -> pd.DataFrame:
+import ast
+
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import streamlit as st
+
+st.set_page_config(page_title="Top 10 Agents", layout="wide")
+
+st.title("🏅 Top 10 Agents")
+st.write(
+    "Select a geography and time window, then tune your price and quality filters to find the best-fit agents."
+)
+
+
+@st.cache_data
+def load_data() -> pd.DataFrame:
+    url = "https://www.dropbox.com/scl/fi/jg966zvvhdsdblmg9jhh8/transactions_2023.01.07_2026.01.06.xlsx?rlkey=gwk06io5pp4lhaa1v3d4f4oun&st=2f31dzw8&dl=1"
+    usecols = [
+        "ListAgentFullName",
+        "is_closed",
+        "DaysOnMarket",
+        "pricing_accuracy",
+        "City",
+        "PostalCode",
+        "ClosePrice",
+        "ElementarySchool",
+        "SubdivisionName",
+        "CloseDate",
+        "PropertyCondition",
+        "ListingContractDate",
+        "ListAgentDirectPhone",
+    ]
+    return pd.read_excel(url, usecols=usecols)
+
+
 def is_resale(value) -> bool:
     if isinstance(value, list):
         return len(value) > 0 and value[0] == "Resale"
@@ -54,63 +89,7 @@ def to_top_percent_bucket(scores: pd.Series) -> pd.Series:
 
     return pct_rank.apply(bucket)
 
-def add_percentile_and_tier(
-    df: pd.DataFrame,
-    value_col: str,
-    out_pct_col: str,
-    out_tier_col: str,
-    higher_is_better: bool = True,
-    tie_break_cols: list[str] | None = None,
-) -> pd.DataFrame:
-    """
-    Adds:
-      - out_pct_col: percentile score 0..100 (higher = better)
-      - out_tier_col: "Top X%" bucket based on that percentile
 
-    Tie-breaking:
-      We add tiny deterministic noise based on tie_break_cols to avoid identical ranks.
-    """
-    s = pd.to_numeric(df[value_col], errors="coerce").fillna(np.nan)
-
-    # Flip if lower is better (e.g., days on market)
-    if not higher_is_better:
-        s = -s
-
-    # Deterministic tie-breaker noise
-    if tie_break_cols:
-        # Build a stable per-row numeric key from tie-break columns
-        key = (
-            df[tie_break_cols]
-            .astype(str)
-            .agg("|".join, axis=1)
-            .apply(lambda x: abs(hash(x)) % 1_000_000)
-            .astype(float)
-        )
-        noise = (key / 1_000_000) * 1e-6  # very tiny
-        s_adj = s + noise
-    else:
-        s_adj = s
-
-    # Percentile score: 0..100 where higher = better
-    pct = s_adj.rank(pct=True, ascending=True, method="average") * 100
-    df[out_pct_col] = pct
-
-    # Convert percentile to "Top X%" where smaller top% is better
-    top_pct = 100 - df[out_pct_col]
-
-    def bucket(p: float) -> str:
-        if p <= 1: return "Top 1%"
-        if p <= 3: return "Top 3%"
-        if p <= 5: return "Top 5%"
-        if p <= 10: return "Top 10%"
-        if p <= 20: return "Top 20%"
-        if p <= 30: return "Top 30%"
-        if p <= 50: return "Top 50%"
-        return "Top 100%"
-
-    df[out_tier_col] = top_pct.apply(bucket)
-    return df
-    
 data = load_data().copy()
 
 # Ensure numeric/date columns are properly typed
@@ -136,7 +115,105 @@ if not selected_cities:
 geo_filtered = data[data["City"].isin(selected_cities)].copy()
 
 zip_options = sorted([x for x in geo_filtered["PostalCode"].dropna().unique() if x and x.lower() != "nan"])
-@@ -269,51 +216,51 @@ if in_price_range.empty:
+selected_zips = st.multiselect("Zip Code (optional)", options=zip_options)
+if selected_zips:
+    geo_filtered = geo_filtered[geo_filtered["PostalCode"].isin(selected_zips)]
+
+school_options = sorted(
+    [x for x in geo_filtered["ElementarySchool"].dropna().unique() if str(x).strip() and str(x).lower() != "nan"]
+)
+selected_schools = st.multiselect("Elementary School (optional)", options=school_options)
+if selected_schools:
+    geo_filtered = geo_filtered[geo_filtered["ElementarySchool"].isin(selected_schools)]
+
+if geo_filtered.empty:
+    st.warning("No records found for the selected geographic filters.")
+    st.stop()
+
+st.subheader("⏳ Time Window")
+selected_years = st.selectbox("Years to look back", options=[1, 2, 3], index=0)
+latest_date = geo_filtered["ActivityDate"].max()
+
+if pd.isna(latest_date):
+    st.warning("No valid listing/close dates in selected geography.")
+    st.stop()
+
+cutoff_date = latest_date - pd.DateOffset(years=int(selected_years))
+window_filtered = geo_filtered[geo_filtered["ActivityDate"] >= cutoff_date].copy()
+
+if window_filtered.empty:
+    st.warning("No records in this geography and lookback window.")
+    st.stop()
+
+# Keep resale-only consistency with the alternate ranking page
+window_filtered = window_filtered[window_filtered["PropertyCondition"].apply(is_resale)].copy()
+if window_filtered.empty:
+    st.warning("No resale listings in this geography and lookback window.")
+    st.stop()
+
+# ---------------- Aggregate summary ----------------
+st.subheader("📊 Regional Summary")
+summary_total_agents = window_filtered["ListAgentFullName"].nunique()
+summary_total_transactions = len(window_filtered)
+summary_total_sales_m = window_filtered["ClosePrice"].sum() / 1_000_000
+summary_avg_dom = window_filtered["DaysOnMarket"].mean()
+summary_avg_close_rate = window_filtered["is_closed"].mean()
+summary_avg_pricing_accuracy = window_filtered["pricing_accuracy"].mean()
+
+m1, m2, m3 = st.columns(3)
+m4, m5, m6 = st.columns(3)
+
+m1.metric("Total Agents", f"{summary_total_agents:,}")
+m2.metric(f"Transactions (Past {selected_years}y)", f"{summary_total_transactions:,}")
+m3.metric("Total Sales (M$)", f"{summary_total_sales_m:,.2f}")
+m4.metric("Avg Days on Market", f"{summary_avg_dom:,.1f}")
+m5.metric("Avg Close Rate", f"{summary_avg_close_rate:.1%}")
+m6.metric("Avg Pricing Accuracy", f"{summary_avg_pricing_accuracy:,.3f}")
+
+# ---------------- Price distribution + range ----------------
+st.subheader("💰 Price Distribution & Range")
+fig_hist = px.histogram(
+    window_filtered,
+    x="ClosePrice",
+    nbins=30,
+    title="Close Price Distribution",
+    labels={"ClosePrice": "Close Price"},
+)
+st.plotly_chart(fig_hist, use_container_width=True)
+
+min_price = int(window_filtered["ClosePrice"].min())
+max_price = int(window_filtered["ClosePrice"].max())
+mean_price = int(window_filtered["ClosePrice"].mean())
+std_price = float(window_filtered["ClosePrice"].std())
+
+step_size = max(1000, min(5000, int((max_price - min_price) / 200) if max_price > min_price else 1000))
+
+target_price = st.slider(
+    "Target price",
+    min_value=min_price,
+    max_value=max_price,
+    value=mean_price,
+    step=step_size,
+)
+
+std_width = st.slider(
+    "Price band width (standard deviations)",
+    min_value=0.1,
+    max_value=2.0,
+    value=1.0,
+    step=0.1,
+)
+
+lower_bound = target_price - std_width * std_price
+upper_bound = target_price + std_width * std_price
+st.write(f"Selected price range: **${lower_bound:,.0f} - ${upper_bound:,.0f}**")
+
+in_price_range = window_filtered[
+    (window_filtered["ClosePrice"] >= lower_bound) & (window_filtered["ClosePrice"] <= upper_bound)
+].copy()
+
+if in_price_range.empty:
+    st.warning("No listings found in this price band.")
     st.stop()
 
 # ---------------- Agent-level summary ----------------
@@ -162,7 +239,6 @@ agent_stats["pricing_accuracy_score"] = agent_stats["avg_pricing_accuracy"].appl
 agent_stats["volume_score"] = percentile_score(agent_stats["total_transactions"])
 agent_stats["sales_score"] = percentile_score(agent_stats["total_sales"])
 agent_stats["close_rate_score"] = percentile_score(agent_stats["close_rate"])
-agent_stats["days_on_market_score"] = 100 - agent_stats["median_days_on_market"].rank(pct=True) * 100
 agent_stats["days_on_market_score"] = score_days_on_market(agent_stats["median_days_on_market"])
 
 # ---------------- Filters: min/max transaction count ----------------
@@ -189,7 +265,36 @@ if agent_stats.empty:
     st.warning("No agents match the selected transaction range.")
     st.stop()
 
-@@ -350,87 +297,84 @@ priority_options = {
+st.subheader("👥 Filtered Agent Count")
+st.metric("Agents matching current filters", f"{agent_stats['ListAgentFullName'].nunique():,}")
+
+# ---------------- Weights ----------------
+st.subheader("⚖️ Scoring Weights")
+priority_options = {
+    "Maximizing price (even if it takes longer)": {
+        "Volume": 0.25,
+        "Close Rate": 0.20,
+        "Days on Market": 0.15,
+        "Pricing Accuracy": 0.40,
+    },
+    "Selling efficiently at a fair market price": {
+        "Volume": 0.20,
+        "Close Rate": 0.25,
+        "Days on Market": 0.30,
+        "Pricing Accuracy": 0.25,
+    },
+    "A smooth, predictable closing": {
+        "Volume": 0.20,
+        "Close Rate": 0.40,
+        "Days on Market": 0.20,
+        "Pricing Accuracy": 0.20,
+    },
+    "A low-stress process with clear guidance": {
+        "Volume": 0.25,
+        "Close Rate": 0.35,
+        "Days on Market": 0.15,
+        "Pricing Accuracy": 0.25,
+    },
 }
 
 selected_priority = st.selectbox("Choose seller priority", options=list(priority_options.keys()))
@@ -215,12 +320,6 @@ agent_stats = agent_stats.sort_values(
 )
 
 agent_stats["Tier"] = to_top_percent_bucket(agent_stats["overall_score"])
-# Percentiles + tiers (ties broken deterministically)
-tie_cols = ["ListAgentFullName", "total_transactions", "total_sales"]
-# Tiers: NO tie break
-agent_stats = add_percentile_and_tier(agent_stats, "total_transactions", "Volume Percentile", "Volume Tier", True, None)
-agent_stats = add_percentile_and_tier(agent_stats, "close_rate", "Close Rate Percentile", "Close Rate Tier", True, None)
-agent_stats = add_percentile_and_tier(agent_stats, "median_days_on_market", "Median DOM Percentile", "Median DOM Tier", False, None)
 # Reuse the same metric definitions as 1_Alternate_Ranking.py for performance tiers.
 agent_stats["Volume Tier"] = to_top_percent_bucket(agent_stats["volume_score"])
 agent_stats["Close Rate Tier"] = to_top_percent_bucket(agent_stats["close_rate_score"])
@@ -247,8 +346,6 @@ final_cols = [
     "total_sales",
     "Volume Tier",
     "Close Rate Tier",
-    "Mean DOM Tier",
-    "Median DOM Tier",
     "Days on Market Tier",
     "Pricing Accuracy Tier",
 ]
@@ -271,8 +368,6 @@ detail_cols = [
     "ListAgentFullName",
     "Volume Tier",
     "Close Rate Tier",
-    "Mean DOM Tier",
-    "Median DOM Tier",
     "Days on Market Tier",
     "Pricing Accuracy Tier",
     "total_transactions",
