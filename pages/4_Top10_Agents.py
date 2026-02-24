@@ -298,7 +298,7 @@ std_price = float(window_filtered["ClosePrice"].std())
 
 step_size = max(1000, min(5000, int((max_price - min_price) / 200) if max_price > min_price else 1000))
 
-target_price_default = min(max(1_000_000, min_price), max_price)
+target_price_default = mean_price # min(max(1_000_000, min_price), max_price)
 target_price = st.slider(
     "Target price",
     min_value=min_price,
@@ -697,6 +697,7 @@ def render_scope_top10_tables(
     st.subheader(f"📋 Selected Agent Performance Details ({scope_label})")
     scoped_detail_cols = [
         "ListAgentFullName",
+        "overall_score",
         "total_transactions_scope",
         "Volume Tier",
         "close_rate",
@@ -716,6 +717,7 @@ def render_scope_top10_tables(
         use_container_width=True,
         column_config={
             "total_transactions_scope": f"Total Transactions ({scope_label} Level)",
+            "overall_score": st.column_config.NumberColumn("Overall Score", format="%.1f"),  # ✅
             "total_sales_m": st.column_config.NumberColumn("Total Sales (M$)", format="%.2f"),
             "Volume Tier": "Volume Tier",
             "Close Rate Tier": "Close Rate Tier",
