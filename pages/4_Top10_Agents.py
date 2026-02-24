@@ -583,19 +583,27 @@ st.dataframe(
 
 
 # ==================== NEWLY ADDED: additional scope-level top-10 tables ====================
-def render_scope_top10_tables(scope_df: pd.DataFrame, scope_label: str, scope_key: str) -> None:
+def render_scope_top10_tables(
+    scope_df: pd.DataFrame,
+    scope_label: str,
+    scope_key: str,
+    anchor_top10: pd.DataFrame,
+) -> None:
+    anchor_agents = set(anchor_top10["ListAgentFullName"].dropna().tolist())
     scoped_in_price_range = scope_df[
-        (scope_df["ClosePrice"] >= lower_bound) & (scope_df["ClosePrice"] <= upper_bound)
+        (scope_df["ClosePrice"] >= lower_bound)
+        & (scope_df["ClosePrice"] <= upper_bound)
+        & (scope_df["ListAgentFullName"].isin(anchor_agents))
     ].copy()
 
     st.subheader(f"🏆 Final Top 10 Agents ({scope_label})")
     st.caption(
-        "Top agents based on selected filters and weighted score. "
-        f"Scope level: {scope_label}. Tiers are computed across all filtered agents before selecting top 10."
+        "Performance summary at this scope for agents in the original most-granular Final Top 10 only. "
+        f"Scope level: {scope_label}."
     )
 
     if scoped_in_price_range.empty:
-        st.warning(f"No listings found in this price band for {scope_label} scope.")
+        st.warning(f"No in-range listings for original Top 10 agents at {scope_label} scope.")
         return
 
     scoped_agent_stats = (
@@ -635,7 +643,7 @@ def render_scope_top10_tables(scope_df: pd.DataFrame, scope_label: str, scope_ke
     ].copy()
 
     if scoped_agent_stats.empty:
-        st.warning(f"No agents match the selected transaction range for {scope_label} scope.")
+        st.warning(f"No original Top 10 agents match transaction filter at {scope_label} scope.")
         return
 
     scoped_agent_stats["close_rate"] = scoped_agent_stats["closed_count"] / scoped_agent_stats["total_transactions"]
@@ -662,14 +670,10 @@ def render_scope_top10_tables(scope_df: pd.DataFrame, scope_label: str, scope_ke
     scoped_agent_stats["Total Sales Tier"] = to_top_percent_bucket(scoped_agent_stats["total_sales_score"])
     scoped_agent_stats["Pricing Accuracy Tier"] = to_top_percent_bucket(-scoped_agent_stats["avg_pricing_accuracy"])
 
-    scoped_agent_stats = scoped_agent_stats.sort_values(
-        by=["overall_score", "total_transactions", "total_sales", "close_rate", "median_days_on_market"],
-        ascending=[False, False, False, False, True],
-    )
-
-    scoped_final_top10 = scoped_agent_stats.head(10).copy()
-    scoped_final_top10["Rank"] = scoped_final_top10["overall_score"].rank(ascending=False, method="dense").astype("Int64")
-    scoped_final_top10 = scoped_final_top10.sort_values(["Rank", "overall_score"], ascending=[True, False])
+    base_rank_map = anchor_top10.set_index("ListAgentFullName")["Rank"]
+    scoped_agent_stats["Rank"] = scoped_agent_stats["ListAgentFullName"].map(base_rank_map).astype("Int64")
+    scoped_agent_stats = scoped_agent_stats.sort_values(["Rank", "overall_score"], ascending=[True, False])
+    scoped_final_top10 = scoped_agent_stats.copy()
     scoped_final_top10["total_sales_m"] = (scoped_final_top10["total_sales"] / 1_000_000).round(2)
 
     scoped_transaction_count_map = scoped_in_price_range.groupby("ListAgentFullName", dropna=False)["ListAgentFullName"].count()
@@ -730,9 +734,9 @@ def render_scope_top10_tables(scope_df: pd.DataFrame, scope_label: str, scope_ke
 
 
 # Additional tables requested: city-level and zipcode-level performance views
-render_scope_top10_tables(city_scoped, "Selected City", "city")
+render_scope_top10_tables(city_scoped, "Selected City", "city", final_top10)
 if selected_zips:
-    render_scope_top10_tables(zip_scoped, "Selected Zip", "zip")
+    render_scope_top10_tables(zip_scoped, "Selected Zip", "zip", final_top10)
 else:
     st.info("Zip-level Top 10 table is shown after you select at least one Zip Code.")
 # ================= END NEWLY ADDED BLOCK =================
