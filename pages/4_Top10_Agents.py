@@ -583,7 +583,7 @@ st.dataframe(
 
 
 # ==================== NEWLY ADDED: additional scope-level top-10 tables ====================
-def render_scope_top10_tables(scope_df: pd.DataFrame, scope_label: str) -> None:
+def render_scope_top10_tables(scope_df: pd.DataFrame, scope_label: str, scope_key: str) -> None:
     scoped_in_price_range = scope_df[
         (scope_df["ClosePrice"] >= lower_bound) & (scope_df["ClosePrice"] <= upper_bound)
     ].copy()
@@ -672,25 +672,28 @@ def render_scope_top10_tables(scope_df: pd.DataFrame, scope_label: str) -> None:
     scoped_final_top10 = scoped_final_top10.sort_values(["Rank", "overall_score"], ascending=[True, False])
     scoped_final_top10["total_sales_m"] = (scoped_final_top10["total_sales"] / 1_000_000).round(2)
 
-    scoped_sales_count_map = scope_df.groupby("ListAgentFullName", dropna=False)["is_closed"].sum()
+    scoped_transaction_count_map = scoped_in_price_range.groupby("ListAgentFullName", dropna=False)["ListAgentFullName"].count()
     scoped_final_top10["sales_count_all_years"] = scoped_final_top10["ListAgentFullName"].map(sales_count_all_map).fillna(0).astype(int)
-    scoped_final_top10["sales_count_selected_cities"] = scoped_final_top10["ListAgentFullName"].map(sales_count_city_map).fillna(0).astype(int)
-    scoped_final_top10["sales_count_selected_zip"] = (
-        scoped_final_top10["ListAgentFullName"].map(scoped_sales_count_map).fillna(0).astype(int)
-    )
 
-    if sales_count_school_map is None:
-        scoped_final_top10["sales_count_selected_school"] = pd.NA
-    else:
-        scoped_final_top10["sales_count_selected_school"] = (
-            scoped_final_top10["ListAgentFullName"].map(sales_count_school_map).fillna(0).astype(int)
+    if scope_key == "city":
+        scoped_final_top10["sales_count_selected_cities"] = (
+            scoped_final_top10["ListAgentFullName"].map(scoped_transaction_count_map).fillna(0).astype(int)
         )
+        scoped_final_top10["sales_count_selected_zip"] = pd.NA
+    else:
+        scoped_final_top10["sales_count_selected_cities"] = pd.NA
+        scoped_final_top10["sales_count_selected_zip"] = (
+            scoped_final_top10["ListAgentFullName"].map(scoped_transaction_count_map).fillna(0).astype(int)
+        )
+
+    scoped_final_top10["sales_count_selected_school"] = pd.NA
 
     st.data_editor(
         scoped_final_top10[final_cols],
         use_container_width=True,
         hide_index=True,
         disabled=True,
+        key=f"{scope_key}_top10_editor",
         column_config={
             "Rank": st.column_config.NumberColumn("Rank"),
             "ListAgentFullName": "Agent",
@@ -711,8 +714,8 @@ def render_scope_top10_tables(scope_df: pd.DataFrame, scope_label: str) -> None:
         use_container_width=True,
         column_config={
             "sales_count_all_years": "Sales Count (All Data, Selected Years)",
-            "sales_count_selected_cities": "Sales Count (Selected Cities)",
-            "sales_count_selected_zip": f"Sales Count ({scope_label})",
+            "sales_count_selected_cities": "Sales Count (Selected City Scope, In Price Band)",
+            "sales_count_selected_zip": "Sales Count (Selected Zip Scope, In Price Band)",
             "sales_count_selected_school": "Sales Count (Selected Elementary School)",
             "total_sales_m": st.column_config.NumberColumn("Total Sales (M$)", format="%.2f"),
             "Volume Tier": "Volume Tier",
@@ -727,9 +730,9 @@ def render_scope_top10_tables(scope_df: pd.DataFrame, scope_label: str) -> None:
 
 
 # Additional tables requested: city-level and zipcode-level performance views
-render_scope_top10_tables(city_scoped, "Selected City")
+render_scope_top10_tables(city_scoped, "Selected City", "city")
 if selected_zips:
-    render_scope_top10_tables(zip_scoped, "Selected Zip")
+    render_scope_top10_tables(zip_scoped, "Selected Zip", "zip")
 else:
     st.info("Zip-level Top 10 table is shown after you select at least one Zip Code.")
 # ================= END NEWLY ADDED BLOCK =================
