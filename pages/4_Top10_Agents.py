@@ -16,7 +16,7 @@ st.write(
 @st.cache_data
 def load_data() -> pd.DataFrame:
     url = "https://www.dropbox.com/scl/fi/jg966zvvhdsdblmg9jhh8/transactions_2023.01.07_2026.01.06.xlsx?rlkey=gwk06io5pp4lhaa1v3d4f4oun&st=2f31dzw8&dl=1"
-    required_cols = {
+    usecols = [
         "ListAgentFullName",
         "is_closed",
         "DaysOnMarket",
@@ -30,33 +30,9 @@ def load_data() -> pd.DataFrame:
         "PropertyCondition",
         "ListingContractDate",
         "ListAgentDirectPhone",
-    }
-
-    def include_col(col_name: str) -> bool:
-        col = str(col_name)
-        normalized = "".join(ch for ch in col.lower() if ch.isalnum())
-        is_property_id_col = (
-            normalized in {"propertyid", "propertyidentifier", "propertyidentifierid", "mlsnumber"}
-            or ("property" in normalized and "id" in normalized)
-            or normalized.startswith("acl")
-        )
-        return col in required_cols or is_property_id_col
-
-    return pd.read_excel(url, usecols=include_col)
-
-
-def find_property_id_column(df: pd.DataFrame) -> str | None:
-    preferred_names = ["PropertyId", "PropertyID", "Property Id", "PropertyIdentifier", "ACL"]
-    for col in preferred_names:
-        if col in df.columns:
-            return col
-
-    for col in df.columns:
-        normalized = "".join(ch for ch in str(col).lower() if ch.isalnum())
-        if ("property" in normalized and "id" in normalized) or normalized.startswith("acl"):
-            return col
-
-    return None
+        "ListingId",
+    ]
+    return pd.read_excel(url, usecols=usecols)
 
 
 def clean_property_id(value) -> str:
@@ -64,7 +40,7 @@ def clean_property_id(value) -> str:
     if not text or text.lower() == "nan":
         return ""
 
-    if text.upper().startswith("ACL"):
+    if text.upper().startswith("ACT"):
         text = text[3:]
 
     return text.lstrip("-_:# ")
@@ -155,7 +131,7 @@ def to_top_percent_bucket(scores: pd.Series) -> pd.Series:
     return top_pct.apply(bucket)
 
 data = load_data().copy()
-property_id_col = find_property_id_column(data)
+property_id_col = "ListingId"
 
 # Ensure numeric/date columns are properly typed
 for num_col in ["ClosePrice", "DaysOnMarket", "pricing_accuracy", "is_closed"]:
@@ -369,7 +345,7 @@ agent_stats = (
     .reset_index()
 )
 
-if property_id_col and property_id_col in in_price_range.columns:
+if property_id_col in in_price_range.columns:
     transaction_ids = (
         in_price_range.assign(
             _clean_property_id=in_price_range[property_id_col].apply(clean_property_id)
