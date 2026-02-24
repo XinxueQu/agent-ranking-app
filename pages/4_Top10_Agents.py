@@ -593,19 +593,23 @@ def render_scope_top10_tables(
     scope_key: str,
     anchor_top10: pd.DataFrame,
 ) -> None:
-    # Important: use original scope data (time + resale + city/zip scope),
-    # not the most-granular geography-filtered dataset.
+    # Use original scoped data (time + resale + city/zip scope) and same selected price bucket.
     anchor_agents = set(anchor_top10["ListAgentFullName"].dropna().tolist())
-    scoped_data = scope_df[scope_df["ListAgentFullName"].isin(anchor_agents)].copy()
+    scoped_data = scope_df[
+        scope_df["ListAgentFullName"].isin(anchor_agents)
+        & (scope_df["ClosePrice"] >= lower_bound)
+        & (scope_df["ClosePrice"] <= upper_bound)
+    ].copy()
 
     st.subheader(f"🏆 Final Top 10 Agents ({scope_label})")
     st.caption(
         "Performance summary at this scope for agents in the original most-granular Final Top 10 only. "
-        f"Scope level: {scope_label}. Source: original scoped data (not most-granular filtered data)."
+        f"Scope level: {scope_label}. Geography filter: {'City only' if scope_key == 'city' else 'City + Zip only'} "
+        "(no school/subdivision constraints)."
     )
 
     if scoped_data.empty:
-        st.warning(f"No scoped records for original Top 10 agents at {scope_label} scope.")
+        st.warning(f"No scoped records in selected price range for original Top 10 agents at {scope_label} scope.")
         return
 
     scoped_agent_stats = (
@@ -668,25 +672,7 @@ def render_scope_top10_tables(
     scoped_agent_stats = scoped_agent_stats.sort_values(["Rank", "overall_score"], ascending=[True, False])
     scoped_final_top10 = scoped_agent_stats.copy()
     scoped_final_top10["total_sales_m"] = (scoped_final_top10["total_sales"] / 1_000_000).round(2)
-
-    scoped_final_top10["sales_count_all_years"] = scoped_final_top10["ListAgentFullName"].map(sales_count_all_map).fillna(0).astype(int)
-    scoped_final_top10["sales_count_selected_cities"] = (
-        scoped_final_top10["ListAgentFullName"].map(sales_count_city_map).fillna(0).astype(int)
-    )
-
-    if sales_count_zip_map is None:
-        scoped_final_top10["sales_count_selected_zip"] = pd.NA
-    else:
-        scoped_final_top10["sales_count_selected_zip"] = (
-            scoped_final_top10["ListAgentFullName"].map(sales_count_zip_map).fillna(0).astype(int)
-        )
-
-    if sales_count_school_map is None:
-        scoped_final_top10["sales_count_selected_school"] = pd.NA
-    else:
-        scoped_final_top10["sales_count_selected_school"] = (
-            scoped_final_top10["ListAgentFullName"].map(sales_count_school_map).fillna(0).astype(int)
-        )
+    scoped_final_top10["total_transactions_scope"] = scoped_final_top10["total_transactions"].astype(int)
 
     st.data_editor(
         scoped_final_top10[final_cols],
@@ -709,14 +695,27 @@ def render_scope_top10_tables(
     )
 
     st.subheader(f"📋 Selected Agent Performance Details ({scope_label})")
+    scoped_detail_cols = [
+        "ListAgentFullName",
+        "total_transactions_scope",
+        "Volume Tier",
+        "close_rate",
+        "Close Rate Tier",
+        "mean_days_on_market",
+        "Mean Days on Market Tier",
+        "median_days_on_market",
+        "Median Days on Market Tier",
+        "avg_pricing_accuracy",
+        "Pricing Accuracy Tier",
+        "total_sales_m",
+        "Total Sales Tier",
+        "transaction_property_ids",
+    ]
     st.dataframe(
-        scoped_final_top10[detail_cols],
+        scoped_final_top10[scoped_detail_cols],
         use_container_width=True,
         column_config={
-            "sales_count_all_years": "Sales Count (All Data, Selected Years)",
-            "sales_count_selected_cities": "Sales Count (Selected City Scope)",
-            "sales_count_selected_zip": "Sales Count (Selected Zip Scope)",
-            "sales_count_selected_school": "Sales Count (Selected Elementary School)",
+            "total_transactions_scope": f"Total Transactions ({scope_label} Level)",
             "total_sales_m": st.column_config.NumberColumn("Total Sales (M$)", format="%.2f"),
             "Volume Tier": "Volume Tier",
             "Close Rate Tier": "Close Rate Tier",
