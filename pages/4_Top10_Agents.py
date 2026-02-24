@@ -579,3 +579,157 @@ st.dataframe(
         "transaction_property_ids": st.column_config.TextColumn("Transaction Property IDs"),
     },
 )
+
+
+
+# ==================== NEWLY ADDED: additional scope-level top-10 tables ====================
+def render_scope_top10_tables(scope_df: pd.DataFrame, scope_label: str) -> None:
+    scoped_in_price_range = scope_df[
+        (scope_df["ClosePrice"] >= lower_bound) & (scope_df["ClosePrice"] <= upper_bound)
+    ].copy()
+
+    st.subheader(f"🏆 Final Top 10 Agents ({scope_label})")
+    st.caption(
+        "Top agents based on selected filters and weighted score. "
+        f"Scope level: {scope_label}. Tiers are computed across all filtered agents before selecting top 10."
+    )
+
+    if scoped_in_price_range.empty:
+        st.warning(f"No listings found in this price band for {scope_label} scope.")
+        return
+
+    scoped_agent_stats = (
+        scoped_in_price_range.groupby("ListAgentFullName", dropna=False)
+        .agg(
+            total_transactions=("ListAgentFullName", "count"),
+            total_sales=("ClosePrice", "sum"),
+            closed_count=("is_closed", "sum"),
+            mean_days_on_market=("DaysOnMarket", "mean"),
+            median_days_on_market=("DaysOnMarket", "median"),
+            avg_pricing_accuracy=("pricing_accuracy", "mean"),
+            ListAgentDirectPhone=(
+                "ListAgentDirectPhone",
+                lambda x: x.dropna().astype(str).iloc[0] if x.notna().any() else "",
+            ),
+        )
+        .reset_index()
+    )
+
+    if property_id_col in scoped_in_price_range.columns:
+        scoped_transaction_ids = (
+            scoped_in_price_range.assign(
+                _clean_property_id=scoped_in_price_range[property_id_col].apply(clean_property_id)
+            )
+            .groupby("ListAgentFullName", dropna=False)["_clean_property_id"]
+            .apply(lambda values: "; ".join([v for v in pd.unique(values) if v]))
+        )
+        scoped_agent_stats["transaction_property_ids"] = (
+            scoped_agent_stats["ListAgentFullName"].map(scoped_transaction_ids).fillna("")
+        )
+    else:
+        scoped_agent_stats["transaction_property_ids"] = ""
+
+    scoped_agent_stats = scoped_agent_stats[
+        (scoped_agent_stats["total_transactions"] >= selected_min_tx)
+        & (scoped_agent_stats["total_transactions"] <= selected_max_tx)
+    ].copy()
+
+    if scoped_agent_stats.empty:
+        st.warning(f"No agents match the selected transaction range for {scope_label} scope.")
+        return
+
+    scoped_agent_stats["close_rate"] = scoped_agent_stats["closed_count"] / scoped_agent_stats["total_transactions"]
+    scoped_agent_stats["pricing_accuracy_score"] = scoped_agent_stats["avg_pricing_accuracy"].apply(pricing_accuracy_score)
+    scoped_agent_stats["volume_score"] = percentile_score(scoped_agent_stats["total_transactions"])
+    scoped_agent_stats["sales_score"] = percentile_score(scoped_agent_stats["total_sales"])
+    scoped_agent_stats["close_rate_score"] = percentile_score(scoped_agent_stats["close_rate"])
+    scoped_agent_stats["days_on_market_median_score"] = score_days_on_market(scoped_agent_stats["median_days_on_market"])
+    scoped_agent_stats["days_on_market_mean_score"] = score_days_on_market(scoped_agent_stats["mean_days_on_market"])
+    scoped_agent_stats["total_sales_score"] = percentile_score(scoped_agent_stats["total_sales"])
+
+    scoped_agent_stats["overall_score"] = (
+        weights["Volume"] * scoped_agent_stats["volume_score"]
+        + weights["Close Rate"] * scoped_agent_stats["close_rate_score"]
+        + weights["Days on Market"] * scoped_agent_stats["days_on_market_median_score"]
+        + weights["Pricing Accuracy"] * scoped_agent_stats["pricing_accuracy_score"]
+    )
+
+    scoped_agent_stats = scoped_agent_stats.replace([np.inf, -np.inf], np.nan).dropna(subset=["overall_score"]).copy()
+    scoped_agent_stats["Volume Tier"] = to_top_percent_bucket(scoped_agent_stats["volume_score"])
+    scoped_agent_stats["Close Rate Tier"] = to_top_percent_bucket(scoped_agent_stats["close_rate_score"])
+    scoped_agent_stats["Median Days on Market Tier"] = to_top_percent_bucket(scoped_agent_stats["days_on_market_median_score"])
+    scoped_agent_stats["Mean Days on Market Tier"] = to_top_percent_bucket(scoped_agent_stats["days_on_market_mean_score"])
+    scoped_agent_stats["Total Sales Tier"] = to_top_percent_bucket(scoped_agent_stats["total_sales_score"])
+    scoped_agent_stats["Pricing Accuracy Tier"] = to_top_percent_bucket(-scoped_agent_stats["avg_pricing_accuracy"])
+
+    scoped_agent_stats = scoped_agent_stats.sort_values(
+        by=["overall_score", "total_transactions", "total_sales", "close_rate", "median_days_on_market"],
+        ascending=[False, False, False, False, True],
+    )
+
+    scoped_final_top10 = scoped_agent_stats.head(10).copy()
+    scoped_final_top10["Rank"] = scoped_final_top10["overall_score"].rank(ascending=False, method="dense").astype("Int64")
+    scoped_final_top10 = scoped_final_top10.sort_values(["Rank", "overall_score"], ascending=[True, False])
+    scoped_final_top10["total_sales_m"] = (scoped_final_top10["total_sales"] / 1_000_000).round(2)
+
+    scoped_sales_count_map = scope_df.groupby("ListAgentFullName", dropna=False)["is_closed"].sum()
+    scoped_final_top10["sales_count_all_years"] = scoped_final_top10["ListAgentFullName"].map(sales_count_all_map).fillna(0).astype(int)
+    scoped_final_top10["sales_count_selected_cities"] = scoped_final_top10["ListAgentFullName"].map(sales_count_city_map).fillna(0).astype(int)
+    scoped_final_top10["sales_count_selected_zip"] = (
+        scoped_final_top10["ListAgentFullName"].map(scoped_sales_count_map).fillna(0).astype(int)
+    )
+
+    if sales_count_school_map is None:
+        scoped_final_top10["sales_count_selected_school"] = pd.NA
+    else:
+        scoped_final_top10["sales_count_selected_school"] = (
+            scoped_final_top10["ListAgentFullName"].map(sales_count_school_map).fillna(0).astype(int)
+        )
+
+    st.data_editor(
+        scoped_final_top10[final_cols],
+        use_container_width=True,
+        hide_index=True,
+        disabled=True,
+        column_config={
+            "Rank": st.column_config.NumberColumn("Rank"),
+            "ListAgentFullName": "Agent",
+            "ListAgentDirectPhone": st.column_config.TextColumn("📞 Phone"),
+            "overall_score": st.column_config.NumberColumn("Overall Score", format="%.1f"),
+            "Volume Tier": "Volume Tier",
+            "Close Rate Tier": "Close Rate Tier",
+            "Median Days on Market Tier": "Median DOM Tier",
+            "Mean Days on Market Tier": "Mean DOM Tier",
+            "Total Sales Tier": "Total Sales Tier",
+            "Pricing Accuracy Tier": "Pricing Accuracy Tier",
+        },
+    )
+
+    st.subheader(f"📋 Selected Agent Performance Details ({scope_label})")
+    st.dataframe(
+        scoped_final_top10[detail_cols],
+        use_container_width=True,
+        column_config={
+            "sales_count_all_years": "Sales Count (All Data, Selected Years)",
+            "sales_count_selected_cities": "Sales Count (Selected Cities)",
+            "sales_count_selected_zip": f"Sales Count ({scope_label})",
+            "sales_count_selected_school": "Sales Count (Selected Elementary School)",
+            "total_sales_m": st.column_config.NumberColumn("Total Sales (M$)", format="%.2f"),
+            "Volume Tier": "Volume Tier",
+            "Close Rate Tier": "Close Rate Tier",
+            "Mean Days on Market Tier": "Mean DOM Tier",
+            "Median Days on Market Tier": "Median DOM Tier",
+            "Pricing Accuracy Tier": "Pricing Accuracy Tier",
+            "Total Sales Tier": "Total Sales Tier",
+            "transaction_property_ids": st.column_config.TextColumn("Transaction Property IDs"),
+        },
+    )
+
+
+# Additional tables requested: city-level and zipcode-level performance views
+render_scope_top10_tables(city_scoped, "Selected City")
+if selected_zips:
+    render_scope_top10_tables(zip_scoped, "Selected Zip")
+else:
+    st.info("Zip-level Top 10 table is shown after you select at least one Zip Code.")
+# ================= END NEWLY ADDED BLOCK =================
