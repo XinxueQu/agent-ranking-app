@@ -581,7 +581,6 @@ st.dataframe(
 )
 
 
-
 # ==================== NEWLY ADDED: additional scope-level top-10 tables ====================
 def render_scope_top10_tables(
     scope_df: pd.DataFrame,
@@ -589,25 +588,23 @@ def render_scope_top10_tables(
     scope_key: str,
     anchor_top10: pd.DataFrame,
 ) -> None:
+    # Important: use original scope data (time + resale + city/zip scope),
+    # not the most-granular geography-filtered dataset.
     anchor_agents = set(anchor_top10["ListAgentFullName"].dropna().tolist())
-    scoped_in_price_range = scope_df[
-        (scope_df["ClosePrice"] >= lower_bound)
-        & (scope_df["ClosePrice"] <= upper_bound)
-        & (scope_df["ListAgentFullName"].isin(anchor_agents))
-    ].copy()
+    scoped_data = scope_df[scope_df["ListAgentFullName"].isin(anchor_agents)].copy()
 
     st.subheader(f"🏆 Final Top 10 Agents ({scope_label})")
     st.caption(
         "Performance summary at this scope for agents in the original most-granular Final Top 10 only. "
-        f"Scope level: {scope_label}."
+        f"Scope level: {scope_label}. Source: original scoped data (not most-granular filtered data)."
     )
 
-    if scoped_in_price_range.empty:
-        st.warning(f"No in-range listings for original Top 10 agents at {scope_label} scope.")
+    if scoped_data.empty:
+        st.warning(f"No scoped records for original Top 10 agents at {scope_label} scope.")
         return
 
     scoped_agent_stats = (
-        scoped_in_price_range.groupby("ListAgentFullName", dropna=False)
+        scoped_data.groupby("ListAgentFullName", dropna=False)
         .agg(
             total_transactions=("ListAgentFullName", "count"),
             total_sales=("ClosePrice", "sum"),
@@ -623,10 +620,10 @@ def render_scope_top10_tables(
         .reset_index()
     )
 
-    if property_id_col in scoped_in_price_range.columns:
+    if property_id_col in scoped_data.columns:
         scoped_transaction_ids = (
-            scoped_in_price_range.assign(
-                _clean_property_id=scoped_in_price_range[property_id_col].apply(clean_property_id)
+            scoped_data.assign(
+                _clean_property_id=scoped_data[property_id_col].apply(clean_property_id)
             )
             .groupby("ListAgentFullName", dropna=False)["_clean_property_id"]
             .apply(lambda values: "; ".join([v for v in pd.unique(values) if v]))
@@ -636,15 +633,6 @@ def render_scope_top10_tables(
         )
     else:
         scoped_agent_stats["transaction_property_ids"] = ""
-
-    scoped_agent_stats = scoped_agent_stats[
-        (scoped_agent_stats["total_transactions"] >= selected_min_tx)
-        & (scoped_agent_stats["total_transactions"] <= selected_max_tx)
-    ].copy()
-
-    if scoped_agent_stats.empty:
-        st.warning(f"No original Top 10 agents match transaction filter at {scope_label} scope.")
-        return
 
     scoped_agent_stats["close_rate"] = scoped_agent_stats["closed_count"] / scoped_agent_stats["total_transactions"]
     scoped_agent_stats["pricing_accuracy_score"] = scoped_agent_stats["avg_pricing_accuracy"].apply(pricing_accuracy_score)
@@ -676,7 +664,7 @@ def render_scope_top10_tables(
     scoped_final_top10 = scoped_agent_stats.copy()
     scoped_final_top10["total_sales_m"] = (scoped_final_top10["total_sales"] / 1_000_000).round(2)
 
-    scoped_transaction_count_map = scoped_in_price_range.groupby("ListAgentFullName", dropna=False)["ListAgentFullName"].count()
+    scoped_transaction_count_map = scoped_data.groupby("ListAgentFullName", dropna=False)["ListAgentFullName"].count()
     scoped_final_top10["sales_count_all_years"] = scoped_final_top10["ListAgentFullName"].map(sales_count_all_map).fillna(0).astype(int)
 
     if scope_key == "city":
@@ -718,8 +706,8 @@ def render_scope_top10_tables(
         use_container_width=True,
         column_config={
             "sales_count_all_years": "Sales Count (All Data, Selected Years)",
-            "sales_count_selected_cities": "Sales Count (Selected City Scope, In Price Band)",
-            "sales_count_selected_zip": "Sales Count (Selected Zip Scope, In Price Band)",
+            "sales_count_selected_cities": "Sales Count (Selected City Scope)",
+            "sales_count_selected_zip": "Sales Count (Selected Zip Scope)",
             "sales_count_selected_school": "Sales Count (Selected Elementary School)",
             "total_sales_m": st.column_config.NumberColumn("Total Sales (M$)", format="%.2f"),
             "Volume Tier": "Volume Tier",
