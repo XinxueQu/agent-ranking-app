@@ -469,22 +469,28 @@ final_top10["Rank"] = (
 final_top10 = final_top10.sort_values(["Rank", "overall_score"], ascending=[True, False])
 final_top10["total_sales_m"] = (final_top10["total_sales"] / 1_000_000).round(2)
 
-# Agent sales count context (within selected years)
+# Agent sales count context (aligned to selected time window + price bucket)
 years_filtered_all = data[data["ActivityDate"] >= cutoff_date].copy()
-years_filtered_city = years_filtered_all[years_filtered_all["City"].isin(selected_cities)].copy()
-
 sales_count_all_map = years_filtered_all.groupby("ListAgentFullName", dropna=False)["is_closed"].sum()
-sales_count_city_map = years_filtered_city.groupby("ListAgentFullName", dropna=False)["is_closed"].sum()
+
+city_in_price_range = city_scoped[
+    (city_scoped["ClosePrice"] >= lower_bound) & (city_scoped["ClosePrice"] <= upper_bound)
+].copy()
+sales_count_city_map = city_in_price_range.groupby("ListAgentFullName", dropna=False)["ListAgentFullName"].count()
 
 if selected_zips:
-    years_filtered_zip = years_filtered_city[years_filtered_city["PostalCode"].isin(selected_zips)].copy()
-    sales_count_zip_map = years_filtered_zip.groupby("ListAgentFullName", dropna=False)["is_closed"].sum()
+    zip_in_price_range = zip_scoped[
+        (zip_scoped["ClosePrice"] >= lower_bound) & (zip_scoped["ClosePrice"] <= upper_bound)
+    ].copy()
+    sales_count_zip_map = zip_in_price_range.groupby("ListAgentFullName", dropna=False)["ListAgentFullName"].count()
 else:
     sales_count_zip_map = None
 
 if selected_schools:
-    years_filtered_school = years_filtered_city[years_filtered_city["ElementarySchool"].isin(selected_schools)].copy()
-    sales_count_school_map = years_filtered_school.groupby("ListAgentFullName", dropna=False)["is_closed"].sum()
+    school_in_price_range = school_scoped[
+        (school_scoped["ClosePrice"] >= lower_bound) & (school_scoped["ClosePrice"] <= upper_bound)
+    ].copy()
+    sales_count_school_map = school_in_price_range.groupby("ListAgentFullName", dropna=False)["ListAgentFullName"].count()
 else:
     sales_count_school_map = None
 
@@ -580,7 +586,6 @@ st.dataframe(
     },
 )
 
-
 # ==================== NEWLY ADDED: additional scope-level top-10 tables ====================
 def render_scope_top10_tables(
     scope_df: pd.DataFrame,
@@ -664,21 +669,24 @@ def render_scope_top10_tables(
     scoped_final_top10 = scoped_agent_stats.copy()
     scoped_final_top10["total_sales_m"] = (scoped_final_top10["total_sales"] / 1_000_000).round(2)
 
-    scoped_transaction_count_map = scoped_data.groupby("ListAgentFullName", dropna=False)["ListAgentFullName"].count()
     scoped_final_top10["sales_count_all_years"] = scoped_final_top10["ListAgentFullName"].map(sales_count_all_map).fillna(0).astype(int)
+    scoped_final_top10["sales_count_selected_cities"] = (
+        scoped_final_top10["ListAgentFullName"].map(sales_count_city_map).fillna(0).astype(int)
+    )
 
-    if scope_key == "city":
-        scoped_final_top10["sales_count_selected_cities"] = (
-            scoped_final_top10["ListAgentFullName"].map(scoped_transaction_count_map).fillna(0).astype(int)
-        )
+    if sales_count_zip_map is None:
         scoped_final_top10["sales_count_selected_zip"] = pd.NA
     else:
-        scoped_final_top10["sales_count_selected_cities"] = pd.NA
         scoped_final_top10["sales_count_selected_zip"] = (
-            scoped_final_top10["ListAgentFullName"].map(scoped_transaction_count_map).fillna(0).astype(int)
+            scoped_final_top10["ListAgentFullName"].map(sales_count_zip_map).fillna(0).astype(int)
         )
 
-    scoped_final_top10["sales_count_selected_school"] = pd.NA
+    if sales_count_school_map is None:
+        scoped_final_top10["sales_count_selected_school"] = pd.NA
+    else:
+        scoped_final_top10["sales_count_selected_school"] = (
+            scoped_final_top10["ListAgentFullName"].map(sales_count_school_map).fillna(0).astype(int)
+        )
 
     st.data_editor(
         scoped_final_top10[final_cols],
