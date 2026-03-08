@@ -196,6 +196,19 @@ def feature_price_separation(df: pd.DataFrame, feature_col: str, price_col: str)
     return ratio, grouped.sort_values("median", ascending=False)
 
 
+def category_options(df: pd.DataFrame, col_name: str):
+    if not col_name or col_name not in df.columns:
+        return []
+    values = (
+        df[col_name]
+        .dropna()
+        .astype(str)
+        .str.strip()
+    )
+    values = values[values != ""]
+    return sorted(values.unique().tolist())
+
+
 st.subheader("1) Data source")
 source = st.radio(
     "Choose data source",
@@ -282,30 +295,46 @@ if impact_rows:
 st.subheader("3) Subject property features")
 st.caption("Expanded feature set includes SqFt, Year, Pool, Levels, Acres, Garage, Price, Beds, and Total Baths, plus more location/school filters.")
 
+zip_options = category_options(working, cols["zip"])
+county_options = category_options(working, cols["county"])
+city_options = category_options(working, cols["city"])
+subdivision_options = category_options(working, cols["subdivision"])
+district_options = category_options(working, cols["school_district"])
+elementary_options = category_options(working, cols["elementary"])
+middle_options = category_options(working, cols["middle"])
+high_options = category_options(working, cols["high"])
+levels_options = category_options(working, cols["levels"])
+view_options = category_options(working, cols["view"])
+
+
+def pick_optional(label: str, options: list[str]):
+    choices = ["Not specified", *options]
+    return st.selectbox(label, choices)
+
 loc1, loc2, prop1, prop2 = st.columns(4)
 with loc1:
     address = st.text_input("Address")
-    zip_code = st.text_input("Zip Code")
-    county = st.text_input("County")
-    city = st.text_input("City")
+    zip_code = pick_optional("Zip Code", zip_options)
+    county = pick_optional("County", county_options)
+    city = pick_optional("City", city_options)
 with loc2:
-    subdivision = st.text_input("Subdivision")
-    school_district = st.text_input("School District")
-    elementary = st.text_input("Elementary")
-    middle = st.text_input("Middle or Junior")
-    high = st.text_input("High School")
+    subdivision = pick_optional("Subdivision", subdivision_options)
+    school_district = pick_optional("School District", district_options)
+    elementary = pick_optional("Elementary", elementary_options)
+    middle = pick_optional("Middle or Junior", middle_options)
+    high = pick_optional("High School", high_options)
 with prop1:
     target_price = st.number_input("Price", min_value=0, step=10000, value=0)
     size_sqft = st.number_input("Total Sqft", min_value=0, step=50, value=0)
     acres = st.number_input("Acres", min_value=0.0, step=0.01, value=0.0, format="%.3f")
     year_built = st.number_input("Year Built", min_value=0, step=1, value=0)
-    levels = st.text_input("Levels")
+    levels = pick_optional("Levels", levels_options)
 with prop2:
     garage_spaces = st.number_input("# Garage Spaces", min_value=0.0, step=1.0, value=0.0)
     parking_spaces = st.number_input("Total Parking Spaces", min_value=0.0, step=1.0, value=0.0)
     beds = st.number_input("Total Bedrooms", min_value=0.0, step=1.0, value=0.0)
     baths_total = st.number_input("Total Baths", min_value=0.0, step=0.5, value=0.0)
-    view_type = st.text_input("View")
+    view_type = pick_optional("View", view_options)
 
 bool1, bool2, _ = st.columns(3)
 with bool1:
@@ -329,14 +358,6 @@ with lock_col3:
     lock_waterfront = st.checkbox("Require same waterfront", value=False)
     lock_hoa = st.checkbox("Require same HOA", value=False)
 
-zip_options, district_options, subdivision_options = [], [], []
-if cols["zip"]:
-    zip_options = sorted(working[cols["zip"]].dropna().astype(str).str.strip().unique())
-if cols["school_district"]:
-    district_options = sorted(working[cols["school_district"]].dropna().astype(str).str.strip().unique())
-if cols["subdivision"]:
-    subdivision_options = sorted(working[cols["subdivision"]].dropna().astype(str).str.strip().unique())
-
 locked_zips = st.multiselect("Locked ZIP(s)", options=zip_options) if lock_zip else []
 locked_districts = st.multiselect("Locked School District(s)", options=district_options) if lock_school else []
 locked_subdivisions = st.multiselect("Locked Subdivision(s)", options=subdivision_options) if lock_subdivision else []
@@ -347,24 +368,24 @@ if not run:
 
 subject = {
     "address": address.strip(),
-    "zip": zip_code.strip(),
-    "county": county.strip(),
-    "city": city.strip(),
-    "subdivision": subdivision.strip(),
-    "school_district": school_district.strip(),
-    "elementary": elementary.strip(),
-    "middle": middle.strip(),
-    "high": high.strip(),
+    "zip": "" if zip_code == "Not specified" else zip_code.strip(),
+    "county": "" if county == "Not specified" else county.strip(),
+    "city": "" if city == "Not specified" else city.strip(),
+    "subdivision": "" if subdivision == "Not specified" else subdivision.strip(),
+    "school_district": "" if school_district == "Not specified" else school_district.strip(),
+    "elementary": "" if elementary == "Not specified" else elementary.strip(),
+    "middle": "" if middle == "Not specified" else middle.strip(),
+    "high": "" if high == "Not specified" else high.strip(),
     "close_price": float(target_price) if target_price > 0 else None,
     "size_sqft": float(size_sqft) if size_sqft > 0 else None,
     "acres": float(acres) if acres > 0 else None,
     "year_built": float(year_built) if year_built > 0 else None,
-    "levels": levels.strip(),
+    "levels": "" if levels == "Not specified" else levels.strip(),
     "garage_spaces": float(garage_spaces) if garage_spaces > 0 else None,
     "parking_spaces": float(parking_spaces) if parking_spaces > 0 else None,
     "beds": float(beds) if beds > 0 else None,
     "baths_total": float(baths_total) if baths_total > 0 else None,
-    "view": view_type.strip(),
+    "view": "" if view_type == "Not specified" else view_type.strip(),
     "pool": None if has_pool == "Not specified" else has_pool == "Yes",
     "waterfront": None if is_waterfront == "Not specified" else is_waterfront == "Yes",
     "hoa": None if has_hoa == "Not specified" else has_hoa == "Yes",
