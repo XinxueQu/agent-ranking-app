@@ -10,23 +10,38 @@ st.write(
 )
 
 
-# -------------------- Load Data (same pattern as other pages) --------------------
 @st.cache_data
 def load_default_data():
     url = "https://www.dropbox.com/scl/fi/jg966zvvhdsdblmg9jhh8/transactions_2023.01.07_2026.01.06.xlsx?rlkey=gwk06io5pp4lhaa1v3d4f4oun&st=2f31dzw8&dl=1"
     usecols = [
+        "Address",
         "PostalCode",
+        "CountyOrParish",
+        "City",
+        "SubdivisionName",
+        "SchoolDistrict",
+        "ElementarySchool",
+        "MiddleOrJuniorSchool",
+        "HighSchool",
         "ClosePrice",
         "CloseDate",
-        "ElementarySchool",
-        "SubdivisionName",
-        "Address",
-        "SchoolDistrict",
         "LivingArea",
         "LotSizeSquareFeet",
-        "View",
+        "Acres",
+        "YearBuilt",
+        "Levels",
+        "GarageSpaces",
+        "ParkingFeatures",
+        "BedroomsTotal",
+        "BathroomsTotalInteger",
+        "FullBathrooms",
+        "HalfBathrooms",
         "PoolYN",
+        "WaterfrontYN",
+        "AssociationYN",
+        "View",
         "PropertyCondition",
+        "ListPrice",
     ]
     return pd.read_excel(url, usecols=lambda c: c in usecols)
 
@@ -41,12 +56,31 @@ def read_uploaded_data(uploaded_file):
 ALIASES = {
     "address": ["Address", "PropertyAddress", "StreetAddress", "FullAddress"],
     "zip": ["PostalCode", "Zip", "ZipCode", "ZIP", "ZIPCode"],
-    "school_district": ["SchoolDistrict", "ElementarySchool", "School District", "District"],
-    "size_sqft": ["LivingArea", "BuildingAreaTotal", "SquareFootage", "SizeSqFt", "SqFt"],
+    "county": ["County", "CountyOrParish"],
+    "city": ["City"],
+    "subdivision": ["SubdivisionName", "Subdivision"],
+    "school_district": ["SchoolDistrict", "School District", "District"],
+    "elementary": ["ElementarySchool", "Elementary"],
+    "middle": ["MiddleOrJuniorSchool", "Middle School", "Middle"],
+    "high": ["HighSchool", "High School"],
+    "size_sqft": ["LivingArea", "BuildingAreaTotal", "SquareFootage", "TotalSqft", "SqFt"],
     "land_sqft": ["LotSizeSquareFeet", "LotSizeSqFt", "LandSqFt", "LotSize"],
+    "acres": ["Acres", "LotSizeAcres"],
+    "year_built": ["YearBuilt", "BuiltYear"],
+    "levels": ["Levels", "StoriesTotal", "Stories"],
+    "garage_spaces": ["GarageSpaces", "Garage", "GarageCars"],
+    "parking_spaces": ["ParkingSpaces", "TotalParkingSpaces"],
+    "beds": ["BedroomsTotal", "Beds", "Bedrooms"],
+    "baths_total": ["BathroomsTotalInteger", "TotalBathrooms", "TtlBaths", "Total Baths"],
+    "full_baths": ["FullBathrooms", "FullBaths"],
+    "half_baths": ["HalfBathrooms", "HalfBaths"],
+    "pool": ["PoolYN", "Pool", "PrivatePoolYN"],
+    "waterfront": ["WaterfrontYN", "Waterfront", "WaterfrontFeatures"],
+    "hoa": ["AssociationYN", "HOA"],
     "view": ["View", "ViewYN", "ViewDescription"],
-    "pool": ["Pool", "PoolYN", "PrivatePoolYN"],
+    "condition": ["PropertyCondition", "Condition"],
     "close_price": ["ClosePrice", "SoldPrice", "SalePrice", "Close Price"],
+    "list_price": ["ListPrice", "OriginalListPrice"],
     "close_date": ["CloseDate", "SoldDate", "SaleDate", "Close Date"],
 }
 
@@ -67,69 +101,76 @@ def normalize_text(value):
     return str(value).strip().lower()
 
 
-def parse_pool(value):
+def parse_boolish(value):
     txt = normalize_text(value)
-    return txt in {"true", "yes", "y", "1", "pool"}
+    return txt in {"true", "yes", "y", "1", "pool", "waterfront"}
+
+
+def get_numeric(row, col):
+    if not col:
+        return None
+    val = pd.to_numeric(row[col], errors="coerce")
+    if pd.isna(val):
+        return None
+    return float(val)
 
 
 def price_similarity(row_price, subject_price, global_price_std):
-    if pd.isna(row_price) or row_price <= 0 or subject_price is None or subject_price <= 0:
+    if row_price is None or row_price <= 0 or subject_price is None or subject_price <= 0:
         return None
-
-    # Use distribution-informed tolerance so fuzzy match is grounded in market price behavior.
-    tolerance = max(subject_price * 0.10, global_price_std * 0.50, 1)
+    tolerance = max(subject_price * 0.12, global_price_std * 0.50 if pd.notna(global_price_std) else 0, 1)
     diff = abs(row_price - subject_price)
-    ratio = min(diff / tolerance, 1.0)
-    return 1.0 - ratio
+    return 1.0 - min(diff / tolerance, 1.0)
+
+
+def closeness_similarity(row_value, subject_value, tolerance_fraction):
+    if row_value is None or subject_value is None:
+        return None
+    denominator = max(abs(subject_value) * tolerance_fraction, 1)
+    diff = abs(row_value - subject_value)
+    return 1.0 - min(diff / denominator, 1.0)
 
 
 def score_similarity(row, subject, cols, global_price_std):
     score = 0.0
     weight = 0.0
 
-    # Price is the primary fuzzy proxy.
-    if cols["close_price"] and subject["close_price"]:
-        row_price = pd.to_numeric(row[cols["close_price"]], errors="coerce")
-        px_score = price_similarity(row_price, subject["close_price"], global_price_std)
-        if px_score is not None:
-            weight += 5.0
-            score += 5.0 * px_score
+    score_items = [
+        ("close_price", 6.0, price_similarity(get_numeric(row, cols["close_price"]), subject["close_price"], global_price_std)),
+        ("size_sqft", 2.0, closeness_similarity(get_numeric(row, cols["size_sqft"]), subject["size_sqft"], 0.15)),
+        ("year_built", 1.0, closeness_similarity(get_numeric(row, cols["year_built"]), subject["year_built"], 0.05)),
+        ("acres", 1.3, closeness_similarity(get_numeric(row, cols["acres"]), subject["acres"], 0.35)),
+        ("garage_spaces", 0.8, closeness_similarity(get_numeric(row, cols["garage_spaces"]), subject["garage_spaces"], 0.50)),
+        ("beds", 0.8, closeness_similarity(get_numeric(row, cols["beds"]), subject["beds"], 0.40)),
+        ("baths_total", 0.8, closeness_similarity(get_numeric(row, cols["baths_total"]), subject["baths_total"], 0.40)),
+        ("land_sqft", 0.8, closeness_similarity(get_numeric(row, cols["land_sqft"]), subject["land_sqft"], 0.35)),
+    ]
 
-    # Secondary fuzzy signals.
-    if cols["size_sqft"] and subject["size_sqft"]:
-        row_size = pd.to_numeric(row[cols["size_sqft"]], errors="coerce")
-        if pd.notna(row_size) and row_size > 0:
-            weight += 1.5
-            pct_diff = abs(row_size - subject["size_sqft"]) / max(subject["size_sqft"], 1)
-            score += 1.5 * max(0.0, 1 - min(pct_diff, 1.0))
+    for _, feature_weight, feature_score in score_items:
+        if feature_score is not None:
+            weight += feature_weight
+            score += feature_weight * feature_score
 
-    if cols["land_sqft"] and subject["land_sqft"]:
-        row_land = pd.to_numeric(row[cols["land_sqft"]], errors="coerce")
-        if pd.notna(row_land) and row_land > 0:
-            weight += 1.0
-            pct_diff = abs(row_land - subject["land_sqft"]) / max(subject["land_sqft"], 1)
-            score += 1.0 * max(0.0, 1 - min(pct_diff, 1.0))
+    for categorical_key, cat_weight in [
+        ("zip", 0.6),
+        ("school_district", 0.6),
+        ("subdivision", 0.4),
+        ("city", 0.3),
+        ("view", 0.4),
+        ("levels", 0.4),
+        ("condition", 0.3),
+    ]:
+        subject_value = subject.get(categorical_key)
+        if cols.get(categorical_key) and subject_value:
+            weight += cat_weight
+            if normalize_text(row[cols[categorical_key]]) == normalize_text(subject_value):
+                score += cat_weight
 
-    if cols["view"] and subject["view"]:
-        weight += 0.75
-        if normalize_text(row[cols["view"]]) == normalize_text(subject["view"]):
-            score += 0.75
-
-    if cols["pool"] and subject["pool"] is not None:
-        weight += 0.75
-        if parse_pool(row[cols["pool"]]) == subject["pool"]:
-            score += 0.75
-
-    # Exact match contributes lightly unless explicitly locked.
-    if cols["zip"] and subject["zip"]:
-        weight += 0.5
-        if normalize_text(row[cols["zip"]]) == normalize_text(subject["zip"]):
-            score += 0.5
-
-    if cols["school_district"] and subject["school_district"]:
-        weight += 0.5
-        if normalize_text(row[cols["school_district"]]) == normalize_text(subject["school_district"]):
-            score += 0.5
+    for bool_key in ["pool", "waterfront", "hoa"]:
+        if cols.get(bool_key) and subject.get(bool_key) is not None:
+            weight += 0.35
+            if parse_boolish(row[cols[bool_key]]) == subject[bool_key]:
+                score += 0.35
 
     return 0.0 if weight == 0 else score / weight
 
@@ -146,19 +187,13 @@ def feature_price_separation(df: pd.DataFrame, feature_col: str, price_col: str)
 
     grouped = temp.groupby(feature_col)[price_col].agg(["count", "median"]).reset_index()
     grouped = grouped[grouped["count"] >= 5].copy()
-
     if grouped.empty or grouped.shape[0] < 2:
         return None, None
 
     total_std = temp[price_col].std()
     between_std = grouped["median"].std()
-    if pd.isna(total_std) or total_std == 0:
-        ratio = None
-    else:
-        ratio = between_std / total_std
-
-    grouped = grouped.sort_values("median", ascending=False)
-    return ratio, grouped
+    ratio = None if pd.isna(total_std) or total_std == 0 else between_std / total_std
+    return ratio, grouped.sort_values("median", ascending=False)
 
 
 st.subheader("1) Data source")
@@ -192,40 +227,35 @@ if df.empty:
 cols = {k: find_column(df, k) for k in ALIASES}
 required = [k for k in ["close_date", "close_price"] if not cols[k]]
 if required:
-    st.error(
-        "Required columns not found: "
-        + ", ".join(required)
-        + ". Please ensure close date and close price columns exist."
-    )
+    st.error("Required columns not found: " + ", ".join(required) + ".")
     st.stop()
 
-# -------------------- Prep + 3-year window --------------------
 working = df.copy()
 working[cols["close_date"]] = pd.to_datetime(working[cols["close_date"]], errors="coerce")
 working[cols["close_price"]] = pd.to_numeric(working[cols["close_price"]], errors="coerce")
 working = working.dropna(subset=[cols["close_date"], cols["close_price"]])
 
-if working.empty:
+latest_close_date = working[cols["close_date"]].max()
+if pd.isna(latest_close_date):
     st.warning("No valid sold records with close date and close price.")
     st.stop()
 
-latest_close_date = working[cols["close_date"]].max()
 cutoff = latest_close_date - pd.DateOffset(years=3)
 working = working[working[cols["close_date"]] >= cutoff].copy()
-
 if working.empty:
     st.warning("No sold properties found in the past 3 years.")
     st.stop()
 
 st.caption(f"Using sold comps with close date on or after {cutoff.date()}.")
 
-# -------------------- Feature impact analysis (price differentiation) --------------------
 st.subheader("2) Why these features matter (price differentiation)")
 feature_map = {
     "ZIP": cols["zip"],
     "School District": cols["school_district"],
+    "Subdivision": cols["subdivision"],
     "View": cols["view"],
     "Pool": cols["pool"],
+    "Levels": cols["levels"],
 }
 
 impact_rows = []
@@ -239,151 +269,171 @@ for feature_name, feature_col in feature_map.items():
 
 if impact_rows:
     impact_df = pd.DataFrame(impact_rows).sort_values("Price Separation Score", ascending=False)
-    st.write(
-        "Higher score means group medians for that feature are more spread out relative to overall market price variation."
-    )
     st.dataframe(impact_df, use_container_width=True)
-
-    fig = px.bar(
-        impact_df,
-        x="Feature",
-        y="Price Separation Score",
-        title="Feature Price Separation (higher = more differentiating)",
+    st.plotly_chart(
+        px.bar(impact_df, x="Feature", y="Price Separation Score", title="Feature Price Separation"),
+        use_container_width=True,
     )
-    st.plotly_chart(fig, use_container_width=True)
-
     with st.expander("See top median-price groups per feature"):
         for feature_name, table in impact_tables.items():
             st.markdown(f"**{feature_name}**")
             st.dataframe(table, use_container_width=True)
-else:
-    st.info("Not enough category depth in the current data to estimate feature-based price separation.")
 
-# -------------------- Inputs --------------------
-st.subheader("3) Enter subject property features")
-left, right = st.columns(2)
+st.subheader("3) Subject property features")
+st.caption("Expanded feature set includes SqFt, Year, Pool, Levels, Acres, Garage, Price, Beds, and Total Baths, plus more location/school filters.")
 
-zip_options = []
-if cols["zip"]:
-    zip_options = sorted(working[cols["zip"]].dropna().astype(str).str.strip().unique())
+loc1, loc2, prop1, prop2 = st.columns(4)
+with loc1:
+    address = st.text_input("Address")
+    zip_code = st.text_input("Zip Code")
+    county = st.text_input("County")
+    city = st.text_input("City")
+with loc2:
+    subdivision = st.text_input("Subdivision")
+    school_district = st.text_input("School District")
+    elementary = st.text_input("Elementary")
+    middle = st.text_input("Middle or Junior")
+    high = st.text_input("High School")
+with prop1:
+    target_price = st.number_input("Price", min_value=0, step=10000, value=0)
+    size_sqft = st.number_input("Total Sqft", min_value=0, step=50, value=0)
+    acres = st.number_input("Acres", min_value=0.0, step=0.01, value=0.0, format="%.3f")
+    year_built = st.number_input("Year Built", min_value=0, step=1, value=0)
+    levels = st.text_input("Levels")
+with prop2:
+    garage_spaces = st.number_input("# Garage Spaces", min_value=0.0, step=1.0, value=0.0)
+    parking_spaces = st.number_input("Total Parking Spaces", min_value=0.0, step=1.0, value=0.0)
+    beds = st.number_input("Total Bedrooms", min_value=0.0, step=1.0, value=0.0)
+    baths_total = st.number_input("Total Baths", min_value=0.0, step=0.5, value=0.0)
+    view_type = st.text_input("View")
 
-district_options = []
-if cols["school_district"]:
-    district_options = (
-        sorted(working[cols["school_district"]].dropna().astype(str).str.strip().unique())
-    )
-
-with left:
-    address = st.text_input("Address (optional)")
-    zip_code = st.text_input("ZIP code (optional)")
-    school_district = st.text_input("School district (optional)")
-    view_type = st.text_input("View (optional)")
-
-with right:
-    size_sqft = st.number_input("Living size (sq ft, optional)", min_value=0, step=50, value=0)
-    land_sqft = st.number_input("Land size (sq ft, optional)", min_value=0, step=100, value=0)
-    close_price = st.number_input("Target price (optional)", min_value=0, step=10000, value=0)
-    has_pool = st.selectbox("Pool (optional)", options=["Not specified", "Yes", "No"])
+bool1, bool2, _ = st.columns(3)
+with bool1:
+    has_pool = st.selectbox("Private Pool?", ["Not specified", "Yes", "No"])
+with bool2:
+    is_waterfront = st.selectbox("Waterfront?", ["Not specified", "Yes", "No"])
+    has_hoa = st.selectbox("HOA?", ["Not specified", "Yes", "No"])
 
 st.markdown("#### 🔒 Exact-match locks")
-lock_zip = st.checkbox("Require same ZIP(s)", value=False)
-lock_school = st.checkbox("Require same school district(s)", value=False)
-lock_view = st.checkbox("Require same view", value=False)
-lock_pool = st.checkbox("Require same pool value", value=False)
+lock_col1, lock_col2, lock_col3 = st.columns(3)
+with lock_col1:
+    lock_zip = st.checkbox("Require same ZIP(s)", value=False)
+    lock_school = st.checkbox("Require same school district(s)", value=False)
+    lock_subdivision = st.checkbox("Require same subdivision(s)", value=False)
+with lock_col2:
+    lock_city = st.checkbox("Require same city", value=False)
+    lock_county = st.checkbox("Require same county", value=False)
+    lock_levels = st.checkbox("Require same levels", value=False)
+with lock_col3:
+    lock_pool = st.checkbox("Require same pool", value=False)
+    lock_waterfront = st.checkbox("Require same waterfront", value=False)
+    lock_hoa = st.checkbox("Require same HOA", value=False)
 
-locked_zips = []
-if lock_zip:
-    locked_zips = st.multiselect("ZIP(s) to lock", options=zip_options, default=[zip_code] if zip_code else [])
+zip_options, district_options, subdivision_options = [], [], []
+if cols["zip"]:
+    zip_options = sorted(working[cols["zip"]].dropna().astype(str).str.strip().unique())
+if cols["school_district"]:
+    district_options = sorted(working[cols["school_district"]].dropna().astype(str).str.strip().unique())
+if cols["subdivision"]:
+    subdivision_options = sorted(working[cols["subdivision"]].dropna().astype(str).str.strip().unique())
 
-locked_districts = []
-if lock_school:
-    locked_districts = st.multiselect(
-        "School district(s) to lock",
-        options=district_options,
-        default=[school_district] if school_district else [],
-    )
+locked_zips = st.multiselect("Locked ZIP(s)", options=zip_options) if lock_zip else []
+locked_districts = st.multiselect("Locked School District(s)", options=district_options) if lock_school else []
+locked_subdivisions = st.multiselect("Locked Subdivision(s)", options=subdivision_options) if lock_subdivision else []
 
 run = st.button("Find Top 10 Similar Sold Properties", type="primary")
-
 if not run:
     st.stop()
 
 subject = {
     "address": address.strip(),
     "zip": zip_code.strip(),
+    "county": county.strip(),
+    "city": city.strip(),
+    "subdivision": subdivision.strip(),
     "school_district": school_district.strip(),
-    "size_sqft": int(size_sqft) if size_sqft > 0 else None,
-    "land_sqft": int(land_sqft) if land_sqft > 0 else None,
+    "elementary": elementary.strip(),
+    "middle": middle.strip(),
+    "high": high.strip(),
+    "close_price": float(target_price) if target_price > 0 else None,
+    "size_sqft": float(size_sqft) if size_sqft > 0 else None,
+    "acres": float(acres) if acres > 0 else None,
+    "year_built": float(year_built) if year_built > 0 else None,
+    "levels": levels.strip(),
+    "garage_spaces": float(garage_spaces) if garage_spaces > 0 else None,
+    "parking_spaces": float(parking_spaces) if parking_spaces > 0 else None,
+    "beds": float(beds) if beds > 0 else None,
+    "baths_total": float(baths_total) if baths_total > 0 else None,
     "view": view_type.strip(),
     "pool": None if has_pool == "Not specified" else has_pool == "Yes",
-    "close_price": int(close_price) if close_price > 0 else None,
+    "waterfront": None if is_waterfront == "Not specified" else is_waterfront == "Yes",
+    "hoa": None if has_hoa == "Not specified" else has_hoa == "Yes",
+    "land_sqft": None,
+    "condition": "",
 }
 
-# -------------------- Apply exact locks --------------------
 candidate = working.copy()
-
 if lock_zip and cols["zip"]:
     if locked_zips:
         zset = {z.strip() for z in locked_zips}
         candidate = candidate[candidate[cols["zip"]].astype(str).str.strip().isin(zset)]
     elif subject["zip"]:
         candidate = candidate[candidate[cols["zip"]].astype(str).str.strip() == subject["zip"]]
-
 if lock_school and cols["school_district"]:
     if locked_districts:
         dset = {d.strip().lower() for d in locked_districts}
-        candidate = candidate[
-            candidate[cols["school_district"]].astype(str).str.strip().str.lower().isin(dset)
-        ]
+        candidate = candidate[candidate[cols["school_district"]].astype(str).str.strip().str.lower().isin(dset)]
     elif subject["school_district"]:
-        candidate = candidate[
-            candidate[cols["school_district"]].astype(str).str.strip().str.lower()
-            == subject["school_district"].lower()
-        ]
-
-if lock_view and cols["view"] and subject["view"]:
-    candidate = candidate[
-        candidate[cols["view"]].astype(str).str.strip().str.lower() == subject["view"].lower()
-    ]
-
+        candidate = candidate[candidate[cols["school_district"]].astype(str).str.strip().str.lower() == subject["school_district"].lower()]
+if lock_subdivision and cols["subdivision"]:
+    if locked_subdivisions:
+        sset = {s.strip().lower() for s in locked_subdivisions}
+        candidate = candidate[candidate[cols["subdivision"]].astype(str).str.strip().str.lower().isin(sset)]
+    elif subject["subdivision"]:
+        candidate = candidate[candidate[cols["subdivision"]].astype(str).str.strip().str.lower() == subject["subdivision"].lower()]
+if lock_city and cols["city"] and subject["city"]:
+    candidate = candidate[candidate[cols["city"]].astype(str).str.strip().str.lower() == subject["city"].lower()]
+if lock_county and cols["county"] and subject["county"]:
+    candidate = candidate[candidate[cols["county"]].astype(str).str.strip().str.lower() == subject["county"].lower()]
+if lock_levels and cols["levels"] and subject["levels"]:
+    candidate = candidate[candidate[cols["levels"]].astype(str).str.strip().str.lower() == subject["levels"].lower()]
 if lock_pool and cols["pool"] and subject["pool"] is not None:
-    candidate = candidate[candidate[cols["pool"]].apply(parse_pool) == subject["pool"]]
+    candidate = candidate[candidate[cols["pool"]].apply(parse_boolish) == subject["pool"]]
+if lock_waterfront and cols["waterfront"] and subject["waterfront"] is not None:
+    candidate = candidate[candidate[cols["waterfront"]].apply(parse_boolish) == subject["waterfront"]]
+if lock_hoa and cols["hoa"] and subject["hoa"] is not None:
+    candidate = candidate[candidate[cols["hoa"]].apply(parse_boolish) == subject["hoa"]]
 
 if candidate.empty:
-    st.warning("No records left after applying exact-match locks. Try relaxing one or more locks.")
+    st.warning("No records left after applying exact-match locks. Relax one or more locks.")
     st.stop()
 
-# -------------------- Fuzzy ranking --------------------
-global_price_std = working[cols["close_price"]].std()
+price_std = working[cols["close_price"]].std()
 candidate["similarity_score"] = candidate.apply(
-    lambda row: score_similarity(row, subject, cols, global_price_std),
-    axis=1,
+    lambda row: score_similarity(row, subject, cols, price_std), axis=1
 )
 
-candidate = candidate.sort_values("similarity_score", ascending=False)
-result = candidate.head(10).copy()
-
-if result.empty:
-    st.warning("No comparable properties found.")
-    st.stop()
-
+result = candidate.sort_values("similarity_score", ascending=False).head(10).copy()
 st.success(f"Found {len(result)} comps. Showing top {len(result)} by similarity score.")
 
 show_cols = [
-    c
-    for c in [
-        cols["address"],
-        cols["zip"],
-        cols["school_district"],
-        cols["size_sqft"],
-        cols["land_sqft"],
-        cols["view"],
-        cols["pool"],
-        cols["close_price"],
-        cols["close_date"],
-    ]
-    if c and c in result.columns
+    cols["address"],
+    cols["zip"],
+    cols["city"],
+    cols["school_district"],
+    cols["subdivision"],
+    cols["size_sqft"],
+    cols["year_built"],
+    cols["pool"],
+    cols["levels"],
+    cols["acres"],
+    cols["garage_spaces"],
+    cols["beds"],
+    cols["baths_total"],
+    cols["close_price"],
+    cols["close_date"],
 ]
+show_cols = [c for c in show_cols if c and c in result.columns]
 show_cols.append("similarity_score")
 
 st.subheader("Top 10 Similar Sold Properties")
