@@ -261,36 +261,112 @@ if working.empty:
 
 st.caption(f"Using sold comps with close date on or after {cutoff.date()}.")
 
+def knn_feature_importance(df: pd.DataFrame, cols: dict):
+    target_col = cols["close_price"]
+    feature_keys = [
+        "address", "zip", "county", "city", "subdivision", "school_district", "elementary", "middle", "high",
+        "size_sqft", "land_sqft", "acres", "year_built", "levels", "garage_spaces", "parking_spaces",
+        "beds", "baths_total", "full_baths", "half_baths", "pool", "waterfront", "hoa", "view", "condition", "list_price",
+    ]
+    available = [(k, cols.get(k)) for k in feature_keys if cols.get(k) and cols.get(k) in df.columns]
+    if len(available) < 2:
+        return None, "Not enough feature columns available for attribution."
+
+    work = df[[target_col] + [c for _, c in available]].copy()
+    work[target_col] = pd.to_numeric(work[target_col], errors="coerce")
+
+    numeric_cols = []
+    categorical_cols = []
+    for k, c in available:
+        if k in {"size_sqft", "land_sqft", "acres", "year_built", "garage_spaces", "parking_spaces", "beds", "baths_total", "full_baths", "half_baths", "list_price"}:
+            work[c] = pd.to_numeric(work[c], errors="coerce")
+            numeric_cols.append(c)
+        elif k in {"pool", "waterfront", "hoa"}:
+            work[c] = work[c].apply(parse_boolish).astype(str)
+            categorical_cols.append(c)
+        else:
+            work[c] = work[c].astype(str).str.strip().replace("", pd.NA)
+            categorical_cols.append(c)
+
+    work = work.dropna(subset=[target_col])
+    work = work.dropna(subset=numeric_cols, how="all") if numeric_cols else work
+    work = work.dropna(subset=[c for c in categorical_cols], how="all") if categorical_cols else work
+    if len(work) < 80:
+        return None, "Need at least 80 valid records for stable KNN attribution."
+
+    try:
+        from sklearn.compose import ColumnTransformer
+        from sklearn.inspection import permutation_importance
+        from sklearn.impute import SimpleImputer
+        from sklearn.model_selection import train_test_split
+        from sklearn.neighbors import KNeighborsRegressor
+        from sklearn.pipeline import Pipeline
+        from sklearn.preprocessing import OneHotEncoder
+    except Exception as exc:
+        return None, f"scikit-learn is required for KNN attribution ({exc})."
+
+    X = work[[c for _, c in available]]
+    y = work[target_col]
+
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ("num", Pipeline([("imputer", SimpleImputer(strategy="median"))]), numeric_cols),
+            ("cat", Pipeline([
+                ("imputer", SimpleImputer(strategy="most_frequent")),
+                ("onehot", OneHotEncoder(handle_unknown="ignore", min_frequency=0.02)),
+            ]), categorical_cols),
+        ],
+        remainder="drop",
+    )
+
+    model = Pipeline(
+        steps=[
+            ("prep", preprocessor),
+            ("knn", KNeighborsRegressor(n_neighbors=15, weights="distance")),
+        ]
+    )
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
+    model.fit(X_train, y_train)
+
+    perm = permutation_importance(
+        model,
+        X_test,
+        y_test,
+        n_repeats=8,
+        random_state=42,
+        scoring="neg_mean_absolute_error",
+    )
+
+    importances = pd.DataFrame({
+        "source_col": X.columns,
+        "importance": perm.importances_mean,
+    })
+
+    logical_map = {col_name: key for key, col_name in available}
+    importances["feature"] = importances["source_col"].map(logical_map)
+    out = (
+        importances.groupby("feature", as_index=False)["importance"]
+        .mean()
+        .sort_values("importance", ascending=False)
+        .head(10)
+    )
+    return out, None
+
+
 st.subheader("2) Why these features matter (price differentiation)")
-feature_map = {
-    "ZIP": cols["zip"],
-    "School District": cols["school_district"],
-    "Subdivision": cols["subdivision"],
-    "View": cols["view"],
-    "Pool": cols["pool"],
-    "Levels": cols["levels"],
-}
+st.caption("Method used: **KNN-based feature attribution** via permutation importance on a KNN regressor trained to predict close price from all available subject-feature fields.")
 
-impact_rows = []
-impact_tables = {}
-for feature_name, feature_col in feature_map.items():
-    if feature_col and feature_col in working.columns:
-        ratio, grouped = feature_price_separation(working, feature_col, cols["close_price"])
-        if ratio is not None:
-            impact_rows.append({"Feature": feature_name, "Price Separation Score": ratio})
-            impact_tables[feature_name] = grouped.head(10)
-
-if impact_rows:
-    impact_df = pd.DataFrame(impact_rows).sort_values("Price Separation Score", ascending=False)
+impact_df, impact_err = knn_feature_importance(working, cols)
+if impact_err:
+    st.info(impact_err)
+elif impact_df is not None and not impact_df.empty:
+    impact_df = impact_df.rename(columns={"feature": "Feature", "importance": "KNN Importance"})
     st.dataframe(impact_df, use_container_width=True)
     st.plotly_chart(
-        px.bar(impact_df, x="Feature", y="Price Separation Score", title="Feature Price Separation"),
+        px.bar(impact_df, x="Feature", y="KNN Importance", title="Top 10 Feature Importance (KNN permutation attribution)"),
         use_container_width=True,
     )
-    with st.expander("See top median-price groups per feature"):
-        for feature_name, table in impact_tables.items():
-            st.markdown(f"**{feature_name}**")
-            st.dataframe(table, use_container_width=True)
 
 st.subheader("3) Subject property features")
 st.caption("Expanded feature set includes SqFt, Year, Pool, Levels, Acres, Garage, Price, Beds, and Total Baths, plus more location/school filters.")
