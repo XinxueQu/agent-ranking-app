@@ -13,6 +13,8 @@ st.write(
 )
 
 
+PRECOMPUTED_IMPORTANCE_PATH = Path("data/precomputed_knn_feature_importance.csv")
+
 @st.cache_data(ttl=3600)
 def load_default_data():
     url = "https://www.dropbox.com/scl/fi/jg966zvvhdsdblmg9jhh8/transactions_2023.01.07_2026.01.06.xlsx?rlkey=gwk06io5pp4lhaa1v3d4f4oun&st=2f31dzw8&dl=1"
@@ -227,6 +229,26 @@ def category_options(df: pd.DataFrame, col_name: str):
     return sorted(values.unique().tolist())
 
 
+def load_precomputed_importance(path: Path):
+    if not path.exists():
+        return None, "No precomputed KNN feature-importance file found in repo."
+    try:
+        pre = pd.read_csv(path)
+    except Exception as exc:
+        return None, f"Unable to read precomputed KNN file: {exc}"
+
+    needed = {"Feature", "KNN Importance"}
+    if not needed.issubset(pre.columns):
+        return None, "Precomputed KNN file is missing required columns: Feature, KNN Importance."
+
+    out = pre[["Feature", "KNN Importance"]].copy()
+    out["KNN Importance"] = pd.to_numeric(out["KNN Importance"], errors="coerce")
+    out = out.dropna(subset=["KNN Importance"]).sort_values("KNN Importance", ascending=False).head(10)
+    if out.empty:
+        return None, "Precomputed KNN file has no valid rows."
+    return out, None
+
+
 st.subheader("1) Data source")
 source = st.radio(
     "Choose data source",
@@ -375,27 +397,45 @@ def knn_feature_importance(df: pd.DataFrame, cols: dict):
 
 st.subheader("2) Why these features matter (price differentiation)")
 st.caption("Method used: **KNN-based feature attribution** via permutation importance on a KNN regressor trained to predict close price from all available subject-feature fields.")
-st.caption("⚡ Performance note: this analysis is optional and cached for 30 minutes; click to run/refresh.")
+st.caption("⚡ Fast load mode: page reads precomputed top-10 KNN importance from `data/precomputed_knn_feature_importance.csv`. Use refresh to recompute live only when needed.")
 
-if st.button("Run / Refresh feature importance", key="run_feature_importance"):
+if "impact_df" not in st.session_state:
+    pre_df, pre_err = load_precomputed_importance(PRECOMPUTED_IMPORTANCE_PATH)
+    st.session_state["impact_df"] = pre_df
+    st.session_state["impact_err"] = pre_err
+
+col_a, col_b = st.columns([1, 1])
+with col_a:
+    refresh_live = st.button("Run Live KNN / Refresh", key="run_feature_importance")
+with col_b:
+    reload_pre = st.button("Reload Precomputed from Repo", key="reload_precomputed")
+
+if refresh_live:
     with st.spinner("Computing KNN feature attribution..."):
         impact_df, impact_err = knn_feature_importance(working, cols)
+        if impact_df is not None and not impact_df.empty:
+            impact_df = impact_df.rename(columns={"feature": "Feature", "importance": "KNN Importance"})
+            impact_df.to_csv(PRECOMPUTED_IMPORTANCE_PATH, index=False)
         st.session_state["impact_df"] = impact_df
         st.session_state["impact_err"] = impact_err
+
+if reload_pre:
+    pre_df, pre_err = load_precomputed_importance(PRECOMPUTED_IMPORTANCE_PATH)
+    st.session_state["impact_df"] = pre_df
+    st.session_state["impact_err"] = pre_err
 
 impact_df = st.session_state.get("impact_df")
 impact_err = st.session_state.get("impact_err")
 if impact_err:
     st.info(impact_err)
 elif impact_df is not None and not impact_df.empty:
-    impact_df = impact_df.rename(columns={"feature": "Feature", "importance": "KNN Importance"})
     st.dataframe(impact_df, use_container_width=True)
     st.plotly_chart(
         px.bar(impact_df, x="Feature", y="KNN Importance", title="Top 10 Feature Importance (KNN permutation attribution)"),
         use_container_width=True,
     )
 else:
-    st.info("Feature importance has not been run yet for this session.")
+    st.info("Feature importance unavailable. Run live KNN once, then results can be stored in-repo for fast loads.")
 
 st.subheader("3) Subject property features")
 st.caption("Expanded feature set includes SqFt, Year, Pool, Levels, Acres, Garage, Price, Beds, and Total Baths, plus more location/school filters.")
