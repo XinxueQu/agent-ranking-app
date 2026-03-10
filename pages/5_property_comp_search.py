@@ -1,3 +1,6 @@
+from datetime import datetime, timedelta
+from pathlib import Path
+
 import pandas as pd
 import plotly.express as px
 import streamlit as st
@@ -10,7 +13,7 @@ st.write(
 )
 
 
-@st.cache_data
+@st.cache_data(ttl=3600)
 def load_default_data():
     url = "https://www.dropbox.com/scl/fi/jg966zvvhdsdblmg9jhh8/transactions_2023.01.07_2026.01.06.xlsx?rlkey=gwk06io5pp4lhaa1v3d4f4oun&st=2f31dzw8&dl=1"
     usecols = [
@@ -43,7 +46,22 @@ def load_default_data():
         "PropertyCondition",
         "ListPrice",
     ]
-    return pd.read_excel(url, usecols=lambda c: c in usecols)
+    cache_path = Path("data/default_property_comp_cache.parquet")
+    if cache_path.exists():
+        mtime = datetime.fromtimestamp(cache_path.stat().st_mtime)
+        if datetime.now() - mtime < timedelta(hours=24):
+            try:
+                return pd.read_parquet(cache_path)
+            except Exception:
+                pass
+
+    df = pd.read_excel(url, usecols=lambda c: c in usecols)
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        df.to_parquet(cache_path, index=False)
+    except Exception:
+        pass
+    return df
 
 
 @st.cache_data
@@ -261,6 +279,7 @@ if working.empty:
 
 st.caption(f"Using sold comps with close date on or after {cutoff.date()}.")
 
+@st.cache_data(ttl=1800)
 def knn_feature_importance(df: pd.DataFrame, cols: dict):
     target_col = cols["close_price"]
     feature_keys = [
@@ -333,7 +352,7 @@ def knn_feature_importance(df: pd.DataFrame, cols: dict):
         model,
         X_test,
         y_test,
-        n_repeats=8,
+        n_repeats=4,
         random_state=42,
         scoring="neg_mean_absolute_error",
     )
@@ -356,8 +375,16 @@ def knn_feature_importance(df: pd.DataFrame, cols: dict):
 
 st.subheader("2) Why these features matter (price differentiation)")
 st.caption("Method used: **KNN-based feature attribution** via permutation importance on a KNN regressor trained to predict close price from all available subject-feature fields.")
+st.caption("⚡ Performance note: this analysis is optional and cached for 30 minutes; click to run/refresh.")
 
-impact_df, impact_err = knn_feature_importance(working, cols)
+if st.button("Run / Refresh feature importance", key="run_feature_importance"):
+    with st.spinner("Computing KNN feature attribution..."):
+        impact_df, impact_err = knn_feature_importance(working, cols)
+        st.session_state["impact_df"] = impact_df
+        st.session_state["impact_err"] = impact_err
+
+impact_df = st.session_state.get("impact_df")
+impact_err = st.session_state.get("impact_err")
 if impact_err:
     st.info(impact_err)
 elif impact_df is not None and not impact_df.empty:
@@ -367,6 +394,8 @@ elif impact_df is not None and not impact_df.empty:
         px.bar(impact_df, x="Feature", y="KNN Importance", title="Top 10 Feature Importance (KNN permutation attribution)"),
         use_container_width=True,
     )
+else:
+    st.info("Feature importance has not been run yet for this session.")
 
 st.subheader("3) Subject property features")
 st.caption("Expanded feature set includes SqFt, Year, Pool, Levels, Acres, Garage, Price, Beds, and Total Baths, plus more location/school filters.")
