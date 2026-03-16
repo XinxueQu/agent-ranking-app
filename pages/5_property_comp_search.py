@@ -13,7 +13,16 @@ st.write(
 )
 
 
-PRECOMPUTED_IMPORTANCE_PATH = Path("data/precomputed_knn_feature_importance.csv")
+PRECOMPUTED_IMPORTANCE_PATH = Path("precomputed_knn_feature_importance.csv")
+
+
+def resolve_default_cache_path() -> Path:
+    data_path = Path("data")
+    if data_path.exists() and data_path.is_file():
+        cache_root = Path(".cache")
+    else:
+        cache_root = data_path
+    return cache_root / "default_property_comp_cache.parquet"
 
 @st.cache_data(ttl=3600)
 def load_default_data():
@@ -47,8 +56,12 @@ def load_default_data():
         "View",
         "PropertyCondition",
         "ListPrice",
+        "pricing_accuracy",
+        "DaysOnMarket",
+        "is_closed",
+        "ListAgentFullName",
     ]
-    cache_path = Path("data/default_property_comp_cache.parquet")
+    cache_path = resolve_default_cache_path()
     if cache_path.exists():
         mtime = datetime.fromtimestamp(cache_path.stat().st_mtime)
         if datetime.now() - mtime < timedelta(hours=24):
@@ -58,8 +71,8 @@ def load_default_data():
                 pass
 
     df = pd.read_excel(url, usecols=lambda c: c in usecols)
-    cache_path.parent.mkdir(parents=True, exist_ok=True)
     try:
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
         df.to_parquet(cache_path, index=False)
     except Exception:
         pass
@@ -102,6 +115,10 @@ ALIASES = {
     "close_price": ["ClosePrice", "SoldPrice", "SalePrice", "Close Price"],
     "list_price": ["ListPrice", "OriginalListPrice"],
     "close_date": ["CloseDate", "SoldDate", "SaleDate", "Close Date"],
+    "agent_name": ["ListAgentFullName", "AgentName", "ListAgentName"],
+    "is_closed": ["is_closed", "IsClosed", "ClosedYN"],
+    "days_on_market": ["DaysOnMarket", "DOM"],
+    "pricing_accuracy": ["pricing_accuracy", "PricingAccuracy"],
 }
 
 
@@ -149,6 +166,20 @@ def closeness_similarity(row_value, subject_value, tolerance_fraction):
     denominator = max(abs(subject_value) * tolerance_fraction, 1)
     diff = abs(row_value - subject_value)
     return 1.0 - min(diff / denominator, 1.0)
+
+
+
+
+def percentile_score(series: pd.Series) -> pd.Series:
+    s = pd.to_numeric(series, errors="coerce")
+    if s.notna().sum() == 0:
+        return pd.Series(50.0, index=series.index)
+    return s.rank(pct=True) * 100
+
+
+def pricing_accuracy_to_score(series: pd.Series) -> pd.Series:
+    s = pd.to_numeric(series, errors="coerce")
+    return (1 - (s - 1).abs()) * 100
 
 
 def score_similarity(row, subject, cols, global_price_std):
@@ -397,7 +428,7 @@ def knn_feature_importance(df: pd.DataFrame, cols: dict):
 
 st.subheader("2) Why these features matter (price differentiation)")
 st.caption("Method used: **KNN-based feature attribution** via permutation importance on a KNN regressor trained to predict close price from all available subject-feature fields.")
-st.caption("⚡ Fast load mode: page reads precomputed top-10 KNN importance from `data/precomputed_knn_feature_importance.csv`. Use refresh to recompute live only when needed.")
+st.caption("⚡ Fast load mode: page reads precomputed top-10 KNN importance from `precomputed_knn_feature_importance.csv`. Use refresh to recompute live only when needed.")
 
 if "impact_df" not in st.session_state:
     pre_df, pre_err = load_precomputed_importance(PRECOMPUTED_IMPORTANCE_PATH)
@@ -538,7 +569,15 @@ subject = {
     "condition": "",
 }
 
-candidate = working.copy()
+# NEW ADDITION: similarity is computed for the entire 3-year working dataset first.
+working_scored = working.copy()
+price_std = working_scored[cols["close_price"]].std()
+working_scored["similarity_score"] = working_scored.apply(
+    lambda row: score_similarity(row, subject, cols, price_std), axis=1
+)
+
+# NEW ADDITION: exact-match locks define a subsample from the full scored dataset.
+candidate = working_scored.copy()
 if lock_zip and cols["zip"]:
     if locked_zips:
         zset = {z.strip() for z in locked_zips}
@@ -574,11 +613,6 @@ if candidate.empty:
     st.warning("No records left after applying exact-match locks. Relax one or more locks.")
     st.stop()
 
-price_std = working[cols["close_price"]].std()
-candidate["similarity_score"] = candidate.apply(
-    lambda row: score_similarity(row, subject, cols, price_std), axis=1
-)
-
 result = candidate.sort_values("similarity_score", ascending=False).head(10).copy()
 st.success(f"Found {len(result)} comps. Showing top {len(result)} by similarity score.")
 
@@ -604,3 +638,79 @@ show_cols.append("similarity_score")
 
 st.subheader("Top 10 Similar Sold Properties")
 st.dataframe(result[show_cols], use_container_width=True)
+
+
+# -------------------- NEW ADDITION: Agent-level ranking from subsample --------------------
+st.subheader("🏅 Agent Ranking (from selected comp subsample)")
+agent_col = cols.get("agent_name")
+if not agent_col or agent_col not in candidate.columns:
+    st.info("Agent ranking requires an agent name column (e.g., ListAgentFullName).")
+else:
+    agent_base = candidate.copy()
+    agent_base[agent_col] = agent_base[agent_col].astype(str).str.strip()
+    agent_base = agent_base[agent_base[agent_col] != ""]
+
+    if agent_base.empty:
+        st.info("No agent data available in the filtered subsample.")
+    else:
+        if cols.get("close_price"):
+            agent_base[cols["close_price"]] = pd.to_numeric(agent_base[cols["close_price"]], errors="coerce")
+        if cols.get("days_on_market") and cols["days_on_market"] in agent_base.columns:
+            agent_base[cols["days_on_market"]] = pd.to_numeric(agent_base[cols["days_on_market"]], errors="coerce")
+        if cols.get("pricing_accuracy") and cols["pricing_accuracy"] in agent_base.columns:
+            agent_base[cols["pricing_accuracy"]] = pd.to_numeric(agent_base[cols["pricing_accuracy"]], errors="coerce")
+        if cols.get("is_closed") and cols["is_closed"] in agent_base.columns:
+            agent_base[cols["is_closed"]] = pd.to_numeric(agent_base[cols["is_closed"]], errors="coerce")
+
+        agg_dict = {
+            "transactions": (agent_col, "count"),
+            "total_sales": (cols["close_price"], "sum"),
+            "avg_similarity": ("similarity_score", "mean"),
+            "median_similarity": ("similarity_score", "median"),
+        }
+        if cols.get("is_closed") and cols["is_closed"] in agent_base.columns:
+            agg_dict["closed_count"] = (cols["is_closed"], "sum")
+        if cols.get("days_on_market") and cols["days_on_market"] in agent_base.columns:
+            agg_dict["avg_days_on_market"] = (cols["days_on_market"], "mean")
+        if cols.get("pricing_accuracy") and cols["pricing_accuracy"] in agent_base.columns:
+            agg_dict["avg_pricing_accuracy"] = (cols["pricing_accuracy"], "mean")
+
+        agent_summary = agent_base.groupby(agent_col, dropna=False).agg(**agg_dict).reset_index()
+
+        if "closed_count" in agent_summary.columns:
+            agent_summary["close_rate"] = agent_summary["closed_count"] / agent_summary["transactions"].replace(0, pd.NA)
+        else:
+            agent_summary["close_rate"] = pd.NA
+
+        # similar style scoring to other pages
+        agent_summary["sales_score"] = percentile_score(agent_summary["total_sales"])
+        agent_summary["volume_score"] = percentile_score(agent_summary["transactions"])
+        agent_summary["similarity_score_norm"] = percentile_score(agent_summary["avg_similarity"])
+        if "close_rate" in agent_summary.columns:
+            agent_summary["close_rate_score"] = percentile_score(agent_summary["close_rate"])
+        else:
+            agent_summary["close_rate_score"] = 50.0
+        if "avg_days_on_market" in agent_summary.columns:
+            agent_summary["days_on_market_score"] = 100 - percentile_score(agent_summary["avg_days_on_market"])
+        else:
+            agent_summary["days_on_market_score"] = 50.0
+        if "avg_pricing_accuracy" in agent_summary.columns:
+            agent_summary["pricing_accuracy_score"] = pricing_accuracy_to_score(agent_summary["avg_pricing_accuracy"])
+        else:
+            agent_summary["pricing_accuracy_score"] = 50.0
+
+        agent_summary["overall_agent_score"] = (
+            0.40 * agent_summary["similarity_score_norm"]
+            + 0.20 * agent_summary["sales_score"]
+            + 0.15 * agent_summary["volume_score"]
+            + 0.10 * agent_summary["close_rate_score"]
+            + 0.10 * agent_summary["days_on_market_score"]
+            + 0.05 * agent_summary["pricing_accuracy_score"]
+        )
+
+        top_agents = agent_summary.sort_values("overall_agent_score", ascending=False).head(10)
+
+        st.caption(
+            "Agent ranking is computed from the exact-lock subsample (if locks are set), after similarity scoring was done on the full 3-year dataset."
+        )
+        st.dataframe(top_agents, use_container_width=True)
