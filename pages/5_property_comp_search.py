@@ -662,34 +662,47 @@ else:
         if cols.get("is_closed") and cols["is_closed"] in agent_base.columns:
             agent_base[cols["is_closed"]] = pd.to_numeric(agent_base[cols["is_closed"]], errors="coerce")
 
+        # Similarity-weighted aggregation (no standalone similarity dimension in final score)
+        agent_base["sim_w"] = pd.to_numeric(agent_base["similarity_score"], errors="coerce").fillna(0).clip(lower=0)
+        agent_base["weighted_close_price"] = agent_base[cols["close_price"]] * agent_base["sim_w"]
+
+        if cols.get("days_on_market") and cols["days_on_market"] in agent_base.columns:
+            agent_base["weighted_dom"] = agent_base[cols["days_on_market"]] * agent_base["sim_w"]
+        if cols.get("pricing_accuracy") and cols["pricing_accuracy"] in agent_base.columns:
+            agent_base["weighted_pricing_accuracy"] = agent_base[cols["pricing_accuracy"]] * agent_base["sim_w"]
+        if cols.get("is_closed") and cols["is_closed"] in agent_base.columns:
+            agent_base["weighted_is_closed"] = agent_base[cols["is_closed"]] * agent_base["sim_w"]
+
         agg_dict = {
             "transactions": (agent_col, "count"),
-            "total_sales": (cols["close_price"], "sum"),
+            "weighted_transactions": ("sim_w", "sum"),
+            "weighted_total_sales": ("weighted_close_price", "sum"),
             "avg_similarity": ("similarity_score", "mean"),
             "median_similarity": ("similarity_score", "median"),
         }
-        if cols.get("is_closed") and cols["is_closed"] in agent_base.columns:
-            agg_dict["closed_count"] = (cols["is_closed"], "sum")
-        if cols.get("days_on_market") and cols["days_on_market"] in agent_base.columns:
-            agg_dict["avg_days_on_market"] = (cols["days_on_market"], "mean")
-        if cols.get("pricing_accuracy") and cols["pricing_accuracy"] in agent_base.columns:
-            agg_dict["avg_pricing_accuracy"] = (cols["pricing_accuracy"], "mean")
+        if "weighted_dom" in agent_base.columns:
+            agg_dict["weighted_dom_sum"] = ("weighted_dom", "sum")
+        if "weighted_pricing_accuracy" in agent_base.columns:
+            agg_dict["weighted_pricing_accuracy_sum"] = ("weighted_pricing_accuracy", "sum")
+        if "weighted_is_closed" in agent_base.columns:
+            agg_dict["weighted_is_closed_sum"] = ("weighted_is_closed", "sum")
 
         agent_summary = agent_base.groupby(agent_col, dropna=False).agg(**agg_dict).reset_index()
 
-        if "closed_count" in agent_summary.columns:
-            agent_summary["close_rate"] = agent_summary["closed_count"] / agent_summary["transactions"].replace(0, pd.NA)
+        wden = agent_summary["weighted_transactions"].replace(0, pd.NA)
+        if "weighted_is_closed_sum" in agent_summary.columns:
+            agent_summary["close_rate"] = agent_summary["weighted_is_closed_sum"] / wden
         else:
             agent_summary["close_rate"] = pd.NA
+        if "weighted_dom_sum" in agent_summary.columns:
+            agent_summary["avg_days_on_market"] = agent_summary["weighted_dom_sum"] / wden
+        if "weighted_pricing_accuracy_sum" in agent_summary.columns:
+            agent_summary["avg_pricing_accuracy"] = agent_summary["weighted_pricing_accuracy_sum"] / wden
 
-        # similar style scoring to other pages
-        agent_summary["sales_score"] = percentile_score(agent_summary["total_sales"])
-        agent_summary["volume_score"] = percentile_score(agent_summary["transactions"])
-        agent_summary["similarity_score_norm"] = percentile_score(agent_summary["avg_similarity"])
-        if "close_rate" in agent_summary.columns:
-            agent_summary["close_rate_score"] = percentile_score(agent_summary["close_rate"])
-        else:
-            agent_summary["close_rate_score"] = 50.0
+        # Similar style scoring to other pages, with weighted metrics
+        agent_summary["sales_score"] = percentile_score(agent_summary["weighted_total_sales"])
+        agent_summary["volume_score"] = percentile_score(agent_summary["weighted_transactions"])
+        agent_summary["close_rate_score"] = percentile_score(agent_summary["close_rate"]) if "close_rate" in agent_summary.columns else 50.0
         if "avg_days_on_market" in agent_summary.columns:
             agent_summary["days_on_market_score"] = 100 - percentile_score(agent_summary["avg_days_on_market"])
         else:
@@ -699,12 +712,12 @@ else:
         else:
             agent_summary["pricing_accuracy_score"] = 50.0
 
+        # NEW FORMULA: similarity acts through weighted aggregations, not as a separate dimension.
         agent_summary["overall_agent_score"] = (
-            0.40 * agent_summary["similarity_score_norm"]
-            + 0.20 * agent_summary["sales_score"]
-            + 0.15 * agent_summary["volume_score"]
-            + 0.10 * agent_summary["close_rate_score"]
-            + 0.10 * agent_summary["days_on_market_score"]
+            0.40 * agent_summary["sales_score"]
+            + 0.25 * agent_summary["volume_score"]
+            + 0.15 * agent_summary["close_rate_score"]
+            + 0.15 * agent_summary["days_on_market_score"]
             + 0.05 * agent_summary["pricing_accuracy_score"]
         )
 
@@ -712,5 +725,10 @@ else:
 
         st.caption(
             "Agent ranking is computed from the exact-lock subsample (if locks are set), after similarity scoring was done on the full 3-year dataset."
+        )
+        st.markdown(
+            "**Overall Agent Score formula:** "
+            "`0.40×sales_score + 0.25×volume_score + 0.15×close_rate_score + 0.15×days_on_market_score + 0.05×pricing_accuracy_score` "
+            "(all component metrics are similarity-weighted before scoring)."
         )
         st.dataframe(top_agents, use_container_width=True)
