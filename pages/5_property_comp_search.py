@@ -1,9 +1,13 @@
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
 from datetime import datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+from db import load_transactions
 
 st.set_page_config(page_title="Property Similar Sales Finder", layout="wide")
 
@@ -24,59 +28,8 @@ def resolve_default_cache_path() -> Path:
         cache_root = data_path
     return cache_root / "default_property_comp_cache.parquet"
 
-@st.cache_data(ttl=3600)
 def load_default_data():
-    url = "https://www.dropbox.com/scl/fi/jg966zvvhdsdblmg9jhh8/transactions_2023.01.07_2026.01.06.xlsx?rlkey=gwk06io5pp4lhaa1v3d4f4oun&st=2f31dzw8&dl=1"
-    usecols = [
-        "Address",
-        "PostalCode",
-        "CountyOrParish",
-        "City",
-        "SubdivisionName",
-        "SchoolDistrict",
-        "ElementarySchool",
-        "MiddleOrJuniorSchool",
-        "HighSchool",
-        "ClosePrice",
-        "CloseDate",
-        "LivingArea",
-        "LotSizeSquareFeet",
-        "Acres",
-        "YearBuilt",
-        "Levels",
-        "GarageSpaces",
-        "ParkingFeatures",
-        "BedroomsTotal",
-        "BathroomsTotalInteger",
-        "FullBathrooms",
-        "HalfBathrooms",
-        "PoolYN",
-        "WaterfrontYN",
-        "AssociationYN",
-        "View",
-        "PropertyCondition",
-        "ListPrice",
-        "pricing_accuracy",
-        "DaysOnMarket",
-        "is_closed",
-        "ListAgentFullName",
-    ]
-    cache_path = resolve_default_cache_path()
-    if cache_path.exists():
-        mtime = datetime.fromtimestamp(cache_path.stat().st_mtime)
-        if datetime.now() - mtime < timedelta(hours=24):
-            try:
-                return pd.read_parquet(cache_path)
-            except Exception:
-                pass
-
-    df = pd.read_excel(url, usecols=lambda c: c in usecols)
-    try:
-        cache_path.parent.mkdir(parents=True, exist_ok=True)
-        df.to_parquet(cache_path, index=False)
-    except Exception:
-        pass
-    return df
+    return load_transactions()
 
 
 @st.cache_data

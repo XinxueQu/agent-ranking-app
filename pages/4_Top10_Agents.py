@@ -1,9 +1,13 @@
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
 import ast
 
 import numpy as np
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+from db import load_transactions
 
 st.set_page_config(page_title="Top 10 Agents", layout="wide")
 
@@ -11,28 +15,6 @@ st.title("🏅 Top 10 Agents")
 st.write(
     "Select a geography and time window, then tune your price and quality filters to find the best-fit agents."
 )
-
-
-@st.cache_data
-def load_data() -> pd.DataFrame:
-    url = "https://www.dropbox.com/scl/fi/jg966zvvhdsdblmg9jhh8/transactions_2023.01.07_2026.01.06.xlsx?rlkey=gwk06io5pp4lhaa1v3d4f4oun&st=2f31dzw8&dl=1"
-    usecols = [
-        "ListAgentFullName",
-        "is_closed",
-        "DaysOnMarket",
-        "pricing_accuracy",
-        "City",
-        "PostalCode",
-        "ClosePrice",
-        "ElementarySchool",
-        "SubdivisionName",
-        "CloseDate",
-        "PropertyCondition",
-        "ListingContractDate",
-        "ListAgentDirectPhone",
-        "ListingId",
-    ]
-    return pd.read_excel(url, usecols=usecols)
 
 
 def clean_property_id(value) -> str:
@@ -130,7 +112,7 @@ def to_top_percent_bucket(scores: pd.Series) -> pd.Series:
 
     return top_pct.apply(bucket)
 
-data = load_data().copy()
+data = load_transactions().copy()
 property_id_col = "ListingId"
 
 # Ensure numeric/date columns are properly typed
